@@ -1,0 +1,11 @@
+.DS_Store
+
+# xcodegen-generated — project.yml is the source of truth; run
+# `xcodegen generate` after cloning to produce this locally.
+Arthur.xcodeproj/
+
+# Build artifacts
+DerivedData/
+.build/
+*.xcuserstate
+xcuserdata/
