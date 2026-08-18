@@ -122,6 +122,9 @@ struct AgendaView: View {
         }
         .background(Theme.background(effectiveScheme))
         .preferredColorScheme(store.config.appearance == .system ? nil : effectiveScheme)
+        #if os(macOS)
+        .pinnedOnTop(store.config.pinOnTop)
+        #endif
         .sheet(isPresented: $showingSettings) {
             SettingsView(store: store)
         }
@@ -185,17 +188,14 @@ struct AgendaView: View {
         .buttonStyle(.plain)
     }
 
-    /// Notion-style: left-aligned title at the same size/inset as the
-    /// section headings below it, so it reads as part of the same content
-    /// column rather than a separate free-floating header bar — replaces the
-    /// old center-balanced title + full-width divider underneath it.
-    private var headerDateSize: CGFloat {
-        #if os(iOS)
-        return Theme.brandHeadingSize(horizontalSizeClass: horizontalSizeClass)
-        #else
-        return Theme.brandHeadingSize()
-        #endif
-    }
+    /// Notion-style: left-aligned title at the same size as the tab
+    /// dropdown text below it, so it reads as part of the same content
+    /// column rather than a separate, oversized free-floating header bar.
+    /// Was brandHeadingSize (up to 24pt) — Brandon flagged it as too large
+    /// next to the rest of the UI and asked for it to match "the default
+    /// used in the app," which this now does exactly by reusing tabFontSize
+    /// rather than a separate size scale reserved just for this label.
+    private var headerDateSize: CGFloat { tabFontSize }
 
     private var topBar: some View {
         HStack(spacing: 8) {

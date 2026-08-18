@@ -24,6 +24,16 @@ struct TaskRowView: View {
         #endif
     }
 
+    /// Today already absorbs Overdue (TaskBucketing.matches: taskDate <=
+    /// today) — this just makes the ones that are *strictly* before today
+    /// visually stand out within that merged list, per Brandon's request.
+    /// Not done-gated here since toggleDone already filters done tasks out
+    /// of filteredTasks upstream.
+    private var isOverdue: Bool {
+        guard let date = task.taskDate else { return false }
+        return Calendar.current.startOfDay(for: date) < Calendar.current.startOfDay(for: Date())
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Button {
@@ -33,6 +43,12 @@ struct TaskRowView: View {
                     .foregroundStyle(task.done ? Theme.accentDim : Theme.accentBright)
             }
             .buttonStyle(.plain)
+
+            if isOverdue {
+                Image(systemName: "flag.fill")
+                    .font(.system(size: textFontSize * 0.85))
+                    .foregroundStyle(.red)
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 if isEditing {

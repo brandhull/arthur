@@ -52,6 +52,10 @@ public struct Config: Codable {
     /// than re-searching the folder on every launch. Cleared and re-resolved
     /// if a fetch using it ever fails (e.g. the doc was renamed/moved).
     public var rocksDocumentId: String?
+    /// Mac-only ("pin window on top of all other windows"). Defaults off —
+    /// Brandon's explicit ask for this to be an opt-in toggle, not a new
+    /// always-on default.
+    public var pinOnTop: Bool
 
     public init(craftLink: String = "", inboxes: [InboxDestination] = [],
                 defaultInboxId: String? = nil, appearance: AppearanceMode = .platformDefault,
@@ -60,7 +64,7 @@ public struct Config: Codable {
                 lastBaserowDatabaseId: Int? = nil, lastBaserowTableId: Int? = nil,
                 senecaDatabaseId: Int? = nil, senecaTableId: Int? = nil,
                 senecaQuoteField: String = "Quote", senecaAuthorField: String = "Author",
-                rocksDocumentId: String? = nil) {
+                rocksDocumentId: String? = nil, pinOnTop: Bool = false) {
         self.craftLink = craftLink
         self.inboxes = inboxes
         self.defaultInboxId = defaultInboxId
@@ -74,6 +78,7 @@ public struct Config: Codable {
         self.senecaQuoteField = senecaQuoteField
         self.senecaAuthorField = senecaAuthorField
         self.rocksDocumentId = rocksDocumentId
+        self.pinOnTop = pinOnTop
     }
 
     /// Custom Decodable so an existing config.json saved before the Baserow
@@ -95,6 +100,7 @@ public struct Config: Codable {
         senecaQuoteField = try c.decodeIfPresent(String.self, forKey: .senecaQuoteField) ?? "Quote"
         senecaAuthorField = try c.decodeIfPresent(String.self, forKey: .senecaAuthorField) ?? "Author"
         rocksDocumentId = try c.decodeIfPresent(String.self, forKey: .rocksDocumentId)
+        pinOnTop = try c.decodeIfPresent(Bool.self, forKey: .pinOnTop) ?? false
     }
 
     /// nil means Craft's standard inbox — deliberately not a fallback to

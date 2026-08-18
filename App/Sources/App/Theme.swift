@@ -107,8 +107,6 @@ enum Theme {
         return .custom(name, size: size)
     }
 
-    static let headingSize: CGFloat = 24
-
     /// Weight for "Arthur"/"Tasks"/"Daily Note" specifically. Mac-only: even
     /// Medium, then Regular, still read "cheap"/too bold to Brandon on that
     /// platform specifically (there are only two sections on the page — these
@@ -122,26 +120,12 @@ enum Theme {
         #endif
     }
 
-    /// Size for the header date text ("August 6, 2026"). Mac bumped 1.25x
-    /// (18 -> 22.5) per Brandon's request — the old 18 read too small next
-    /// to the rest of the row. iPhone brought down from headingSize (24) —
-    /// at that size the date wrapped to two lines on narrower screens; iPad
-    /// keeps the full headingSize since it wasn't flagged as a problem
-    /// there.
-    static func brandHeadingSize(horizontalSizeClass: UserInterfaceSizeClass? = nil) -> CGFloat {
-        #if os(macOS)
-        return 22.5
-        #else
-        return horizontalSizeClass == .regular ? headingSize : 19
-        #endif
-    }
-
-    /// Size for "Tasks"/"Daily Note" specifically — smaller than
-    /// brandHeadingSize (which stays reserved for "Arthur" alone). Brandon:
-    /// with only two sections on the page, the section labels don't need to
-    /// stand out as much as the app's own title. "Add Task"/"Add to Daily
-    /// Note"/"Quick Capture" are unaffected — those are native/large sheet
-    /// titles, a different case entirely.
+    /// Size for "Tasks"/"Daily Note", and (since it's the same "default"
+    /// size elsewhere in the app) the header date text too — see
+    /// AgendaView.headerDateSize. With only two sections on the page, the
+    /// section labels don't need to stand out as much as the app's own
+    /// title. "Add Task"/"Add to Daily Note"/"Quick Capture" are unaffected
+    /// — those are native/large sheet titles, a different case entirely.
     static var sectionHeadingSize: CGFloat {
         #if os(macOS)
         return 15

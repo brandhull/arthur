@@ -50,8 +50,25 @@ final class TaskStore: ObservableObject {
         await loadRocks()
     }
 
+    /// Due date first (earliest/most-overdue first — this is what makes the
+    /// overdue ones surface at the top instead of being scattered through
+    /// today's tasks), then folder name alphabetically within a given date,
+    /// per Brandon's request. Tasks with no date reaching this filter isn't
+    /// actually possible today (both Today and Tomorrow already require
+    /// taskDate to be non-nil in TaskBucketing.matches), but nil dates sort
+    /// last rather than crashing an unwrap if that ever changes.
     var filteredTasks: [CraftTask] {
-        tasks.filter { !$0.done && TaskBucketing.matches($0, filter: filter) }
+        tasks
+            .filter { !$0.done && TaskBucketing.matches($0, filter: filter) }
+            .sorted { a, b in
+                switch (a.taskDate, b.taskDate) {
+                case let (da?, db?) where da != db: return da < db
+                case (nil, .some): return false
+                case (.some, nil): return true
+                default:
+                    return (a.containerTitle ?? "").localizedCaseInsensitiveCompare(b.containerTitle ?? "") == .orderedAscending
+                }
+            }
     }
 
     func reloadConfig() {
