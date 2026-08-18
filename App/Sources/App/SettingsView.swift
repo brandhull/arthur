@@ -352,21 +352,6 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                     .padding(.horizontal, 20)
 
-                    #if os(macOS)
-                    // Mac-only — no NSWindow-level equivalent on iOS/iPadOS.
-                    // Bound straight to store.config (not a local @State
-                    // like the rest of this screen) and saved immediately on
-                    // toggle rather than waiting for Done, since the window
-                    // itself needs to react the instant this changes, not
-                    // after a separate save step.
-                    FieldLabel(title: "Window")
-                    Toggle("Keep Arthur on top of other windows", isOn: Binding(
-                        get: { store.config.pinOnTop },
-                        set: { store.config.pinOnTop = $0; store.config.save() }
-                    ))
-                    .padding(.horizontal, 20)
-                    #endif
-
                     FieldLabel(title: "Sync")
                     Button {
                         Task {

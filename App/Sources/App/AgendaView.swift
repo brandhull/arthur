@@ -229,6 +229,27 @@ struct AgendaView: View {
                 }
                 .buttonStyle(.plain)
                 #endif
+                #if os(macOS)
+                // Mac only — no window-level equivalent on iOS/iPadOS. Was a
+                // Settings toggle at first; Brandon: too many clicks for
+                // something he'd want to flip often, and the calendar icon's
+                // slot here is unused on Mac anyway. Brandon named the exact
+                // symbol ("mappin", not a filled/circle variant) and didn't
+                // want a text label — on/off state is conveyed by tint alone
+                // (accent when pinned, secondary when not), same pattern as
+                // the task checkbox's done/not-done color swap elsewhere.
+                Button {
+                    store.config.pinOnTop.toggle()
+                    store.config.save()
+                } label: {
+                    Image(systemName: "mappin")
+                        .font(.system(size: topBarIconSize))
+                        .foregroundStyle(store.config.pinOnTop ? Theme.accentBright : Theme.secondaryText(effectiveScheme))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                #endif
                 Button {
                     showingSettings = true
                 } label: {
