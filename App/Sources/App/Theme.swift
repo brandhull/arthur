@@ -87,17 +87,14 @@ enum Theme {
         scheme == .dark ? darkNeutral : darkText
     }
 
-    /// Noto Serif, bundled in App/Resources/Fonts — not a system font on any
-    /// Apple platform, so it must ship in the app bundle. SIL OFL 1.1, free
-    /// for commercial app use (confirmed 2026-07). Regular/Medium/SemiBold/Bold
-    /// are separate static files with distinct PostScript names
-    /// ("NotoSerif-Regular" / "NotoSerif-Medium" / "NotoSerif-SemiBold" /
-    /// "NotoSerif-Bold") rather than one variable-weight family, so
-    /// `.weight()` on a single Font.custom call won't select the right file —
-    /// pick the PostScript name directly. Medium (not SemiBold, not Bold) is
-    /// what "Arthur" and the section headings use — even SemiBold still read
-    /// too heavy for Brandon's minimalist preference; Medium is the lightest
-    /// step up from Regular that still reads as a heading.
+    /// Noto Serif, bundled in App/Resources/Fonts. Scoped to just the splash
+    /// screen now — Brandon: everywhere else should be the plain system
+    /// font, but the startup splash should keep this. Regular/Medium/
+    /// SemiBold/Bold are separate static files with distinct PostScript
+    /// names ("NotoSerif-Regular" / "NotoSerif-Medium" / "NotoSerif-SemiBold"
+    /// / "NotoSerif-Bold") rather than one variable-weight family, so
+    /// `.weight()` on a single Font.custom call won't select the right file
+    /// — pick the PostScript name directly.
     static func serif(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         let name: String
         switch weight {

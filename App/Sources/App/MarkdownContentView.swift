@@ -76,23 +76,23 @@ struct MarkdownContentView: View {
         switch line.style {
         case .heading(let level):
             Text(line.text)
-                .font(Theme.serif(headingSize(for: level), weight: .semibold))
+                .font(.system(size: headingSize(for: level), weight: .semibold))
                 .foregroundStyle(Theme.primary(scheme))
         case .bullet:
             HStack(alignment: .top, spacing: 8) {
-                Text("•").font(Theme.serif(15))
-                Text(line.text).font(Theme.serif(15)).lineSpacing(3)
+                Text("•").font(.system(size: 15))
+                Text(line.text).font(.system(size: 15)).lineSpacing(3)
             }
             .foregroundStyle(Theme.primary(scheme))
         case .numbered(let n):
             HStack(alignment: .top, spacing: 8) {
-                Text("\(n).").font(Theme.serif(15))
-                Text(line.text).font(Theme.serif(15)).lineSpacing(3)
+                Text("\(n).").font(.system(size: 15))
+                Text(line.text).font(.system(size: 15)).lineSpacing(3)
             }
             .foregroundStyle(Theme.primary(scheme))
         case .quote:
             Text(line.text)
-                .font(Theme.serif(15))
+                .font(.system(size: 15))
                 .italic()
                 .lineSpacing(3)
                 .foregroundStyle(Theme.secondaryText(scheme))
@@ -102,7 +102,7 @@ struct MarkdownContentView: View {
                 }
         case .paragraph:
             Text(line.text)
-                .font(Theme.serif(15))
+                .font(.system(size: 15))
                 .lineSpacing(3)
                 .foregroundStyle(Theme.primary(scheme))
         }

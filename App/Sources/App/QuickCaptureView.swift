@@ -29,6 +29,11 @@ struct QuickCaptureView: View {
     @State private var isCraftSubmitting = false
     @State private var craftErrorMessage: String?
 
+    // MARK: Sub-page picker (see loadSubPages)
+    @State private var subPages: [CraftClient.CraftBlock] = []
+    @State private var subPagesParentId: String?
+    @State private var isLoadingSubPages = false
+
     // MARK: Baserow state
     @State private var databaseId: Int?
     @State private var tableId: Int?
@@ -153,7 +158,16 @@ struct QuickCaptureView: View {
                         // No space between ] and ( — a space there breaks
                         // the link syntax.
                         Text(verbatim: "[link text](URL)")
-                        Text(verbatim: "*** = Separator")
+                        // Not "*** = Separator" — verified live against
+                        // Craft: three asterisks round-trips to
+                        // lineStyle "extraLight", not "regular", despite
+                        // Craft's own docs/assistant claiming --- or ***
+                        // default to regular. Five asterisks is what
+                        // actually produces "regular" (confirmed both by
+                        // testing a real write and by checking existing
+                        // separator blocks already in Brandon's own Craft
+                        // data — every one of them is "*****").
+                        Text(verbatim: "***** = Separator")
                     }
                     .font(.system(size: inputFontSize))
                     .foregroundStyle(Theme.secondaryText(effectiveScheme))
@@ -183,10 +197,47 @@ struct QuickCaptureView: View {
                     HStack {
                         Text(selectedDoc.title).font(.system(size: inputFontSize))
                         Spacer()
-                        Button("Change") { self.selectedDoc = nil }
-                            .font(.system(.footnote))
+                        Button("Change") {
+                            self.selectedDoc = nil
+                            subPages = []
+                        }
+                        .font(.system(.footnote))
                     }
                     .padding(12)
+
+                    // Sub-pages of whatever's selected — Craft's own
+                    // `documents list` never surfaces these (confirmed
+                    // live: a known sub-page title returned nothing from
+                    // it), only full-space `search` does, and that finds
+                    // sub-pages anywhere, with no sense of which one you
+                    // meant. Brandon's call: search for the parent by name
+                    // like today, then pick from what's directly inside it
+                    // — "99 times out of 100 I will know the parent page."
+                    // Hidden once a sub-page's been chosen (selectedDoc no
+                    // longer matches subPagesParentId) — one level deep,
+                    // not a recursive drill-down.
+                    if isLoadingSubPages {
+                        ProgressView().padding(.horizontal, 12).padding(.bottom, 12)
+                    } else if !subPages.isEmpty && selectedDoc.id == subPagesParentId {
+                        Divider()
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(subPages, id: \.id) { sub in
+                                Button {
+                                    self.selectedDoc = CraftDocument(id: sub.id, title: sub.markdown)
+                                    subPages = []
+                                } label: {
+                                    Text(sub.markdown)
+                                        .font(.system(size: inputFontSize))
+                                        .foregroundStyle(.secondary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.bottom, 8)
+                    }
                 } else {
                     TextField("Search documents…", text: $query)
                         .textFieldStyle(.plain)
@@ -204,6 +255,7 @@ struct QuickCaptureView: View {
                                 ForEach(results) { doc in
                                     Button {
                                         selectedDoc = doc
+                                        Task { await loadSubPages(of: doc) }
                                     } label: {
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(doc.title).font(.system(size: inputFontSize))
@@ -261,11 +313,21 @@ struct QuickCaptureView: View {
                 craftText = ""
                 query = ""
                 self.selectedDoc = nil
+                subPages = []
             } catch {
                 craftErrorMessage = error.localizedDescription
                 isCraftSubmitting = false
             }
         }
+    }
+
+    private func loadSubPages(of doc: CraftDocument) async {
+        subPages = []
+        subPagesParentId = doc.id
+        isLoadingSubPages = true
+        defer { isLoadingSubPages = false }
+        let client = CraftClient(url: store.config.craftLink)
+        subPages = (try? await client.subPages(of: doc.id)) ?? []
     }
 
     // MARK: - Baserow section (formerly BaserowCaptureView)

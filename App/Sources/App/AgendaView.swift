@@ -15,11 +15,6 @@ enum HomeTab: String, CaseIterable, Identifiable {
 }
 
 struct AgendaView: View {
-    /// Tapping the title's brain icon replays the splash sequence on demand —
-    /// Brandon's own self-talk ritual, not just a cold-launch thing. Owned by
-    /// ContentView, which is what actually swaps SplashView back in.
-    let onReplaySplash: () -> Void
-
     @StateObject private var store = TaskStore()
     @StateObject private var documentStore = DocumentStore()
     @Environment(\.colorScheme) private var systemScheme
@@ -31,10 +26,6 @@ struct AgendaView: View {
     @State private var showingAddTask = false
     @State private var showingAddNote = false
     @State private var selectedTab: HomeTab = .rocks
-    // Flips whenever the title icon should bounce — on first load, and again
-    // any time it's tapped. .symbolEffect fires on *changes* to this value,
-    // not on the view's initial appearance, so a plain toggle() is enough.
-    @State private var titleIconBounce = false
 
     private var effectiveScheme: ColorScheme {
         switch store.config.appearance {
@@ -69,7 +60,12 @@ struct AgendaView: View {
 
     private var tabFontSize: CGFloat {
         #if os(iOS)
-        return horizontalSizeClass == .regular ? Theme.sectionHeadingSize : 12
+        // 12 on compact (iPhone) used to be sized to fit 4-5 tab labels
+        // side-by-side in the old folder-tab row — stale now that the
+        // dropdown only ever shows one label at a time, with plenty of
+        // horizontal room. Brandon: bump it up, but the box's own height/
+        // padding (tabRowHeight, untouched here) is fine as-is.
+        return horizontalSizeClass == .regular ? Theme.sectionHeadingSize : 16
         #else
         return Theme.sectionHeadingSize
         #endif
@@ -138,7 +134,6 @@ struct AgendaView: View {
         .task {
             await store.refreshIfStale()
             documentStore.refreshIfStale(craftLink: store.config.craftLink)
-            titleIconBounce.toggle()
         }
         // `.task` only fires once per view lifecycle (cold launch), not when
         // resuming from the background — without this, "open the app" after
@@ -204,27 +199,7 @@ struct AgendaView: View {
 
     private var topBar: some View {
         HStack(spacing: 8) {
-            Text(todayFormatted).font(Theme.serif(headerDateSize, weight: Theme.headingWeight))
-            Button {
-                titleIconBounce.toggle()
-                onReplaySplash()
-            } label: {
-                Image(systemName: "brain.head.profile")
-                    .font(.system(size: Theme.headingSize * 0.75, weight: .semibold))
-                    .symbolEffect(.bounce, value: titleIconBounce)
-                    // brain.head.profile's glyph isn't horizontally balanced
-                    // within its own bounding box (same class of issue as the
-                    // FAB's pencil overlay) — nudge left slightly so the
-                    // date+icon pairing doesn't read as lopsided.
-                    .offset(x: -1)
-            }
-            .buttonStyle(.plain)
-
-            #if os(macOS)
-            Text("Habits shape identity.")
-                .font(.system(size: 15))
-                .foregroundStyle(.secondary)
-            #endif
+            Text(todayFormatted).font(.system(size: headerDateSize, weight: Theme.headingWeight))
 
             Spacer()
 
@@ -307,7 +282,7 @@ struct AgendaView: View {
         DropdownButton(
             items: HomeTab.allCases, label: { $0.rawValue }, selection: selectedTabBinding,
             placeholder: "", scheme: effectiveScheme,
-            font: Theme.serif(tabFontSize, weight: Theme.headingWeight), height: tabRowHeight
+            font: .system(size: tabFontSize, weight: Theme.headingWeight), height: tabRowHeight
         )
     }
 

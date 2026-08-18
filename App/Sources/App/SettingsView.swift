@@ -32,6 +32,20 @@ struct SettingsView: View {
     @State private var resolveError: String?
     @State private var isSyncing = false
 
+    // Temporary debug aid — see the comment where debugLogURL's row is
+    // built, and CraftClient.logParseFailure/logTaskAddTrace in ArthurKit.
+    // Two separate files: the generic one is any call() SSE-parse miss
+    // (Quick Capture, Rocks, or a task add's own steps); the trace one is
+    // task-add specific, showing both the append and update legs together.
+    @State private var hasDebugLog = false
+    @State private var hasTaskTraceLog = false
+    private var debugLogURL: URL {
+        Config.supportDir.appendingPathComponent("craft_debug_last_failure.txt")
+    }
+    private var taskTraceLogURL: URL {
+        Config.supportDir.appendingPathComponent("craft_debug_task_trace.txt")
+    }
+
     @State private var baserowToken: String = ""
     @State private var baserowDatabases: [BaserowDatabase] = []
     @State private var newBaserowName = ""
@@ -364,6 +378,52 @@ struct SettingsView: View {
                     )
                     .padding(.horizontal, 20)
                     .disabled(isSyncing || craftLink.isEmpty)
+
+                    // Temporary — only appears after a real "Unexpected
+                    // response from Craft" failure, since CraftClient
+                    // writes to this exact path right before throwing that
+                    // error (see logParseFailure). Brandon's reports of
+                    // that error only ever describe *symptoms* on the Mac
+                    // side ("it reached Craft, right place, right date"),
+                    // since Mac's shared config dir made earlier debugging
+                    // possible there — this button exists because iOS has
+                    // no equivalent easy access to a sandboxed app's
+                    // container without Xcode's device browser. ShareLink
+                    // (not a clipboard copy) so it works identically on Mac
+                    // and iOS, and so the file itself — not just its text —
+                    // reaches me however Brandon chooses to send it.
+                    if hasDebugLog {
+                        FieldLabel(title: "Debug")
+                        ShareLink(item: debugLogURL) {
+                            HStack {
+                                Spacer()
+                                Text("Share Craft Debug Log")
+                                Spacer()
+                            }
+                            .padding(12)
+                        }
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(Theme.primary(effectiveScheme).opacity(Theme.borderOpacity), lineWidth: Theme.borderWidth)
+                        )
+                        .padding(.horizontal, 20)
+                    }
+                    if hasTaskTraceLog {
+                        ShareLink(item: taskTraceLogURL) {
+                            HStack {
+                                Spacer()
+                                Text("Share Task-Add Trace")
+                                Spacer()
+                            }
+                            .padding(12)
+                        }
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(Theme.primary(effectiveScheme).opacity(Theme.borderOpacity), lineWidth: Theme.borderWidth)
+                        )
+                        .padding(.horizontal, 20)
+                        .padding(.top, hasDebugLog ? 8 : 0)
+                    }
                 }
                 .padding(.bottom, 16)
             }
@@ -391,6 +451,8 @@ struct SettingsView: View {
     }
 
     private func loadFromStore() {
+        hasDebugLog = FileManager.default.fileExists(atPath: debugLogURL.path)
+        hasTaskTraceLog = FileManager.default.fileExists(atPath: taskTraceLogURL.path)
         craftLink = store.config.craftLink
         appearance = store.config.appearance
         inboxes = store.config.inboxes

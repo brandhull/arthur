@@ -51,39 +51,62 @@ public struct CraftClient {
         }
 
         let raw = String(decoding: data, as: UTF8.self)
-        let jsonText: String
+        let candidates: [String]
         if raw.hasPrefix("{") {
-            jsonText = raw
-        } else if let dataLine = raw.split(separator: "\n").last(where: { $0.hasPrefix("data: ") }) {
-            // .last, not .first — an SSE stream can carry more than one
-            // "data:" event for a single call (a write like `tasks add`
-            // is more likely to emit an intermediate/progress event before
-            // its final result than a plain read is). Taking the first
-            // event grabbed whichever one showed up first, which wasn't
-            // reliably the one actually carrying `result`/`content` —
-            // confirmed live: Brandon added a task from the floating "+"
-            // button, it reached Craft correctly (visible there, right
-            // place, right due date), but the app threw "Unexpected
-            // response from Craft" and — because addTask's catch block
-            // skips the post-add refresh() on any throw — the new task
-            // then never appeared in Today either, even though it had a
-            // valid date. One parsing bug, two symptoms. The last event in
-            // the stream is always the completed one.
-            jsonText = String(dataLine.dropFirst(6))
+            candidates = [raw]
         } else {
-            throw CraftError.badResponse
+            candidates = raw.split(separator: "\n")
+                .filter { $0.hasPrefix("data: ") }
+                .map { String($0.dropFirst(6)) }
         }
+        guard !candidates.isEmpty else { throw CraftError.badResponse }
 
-        guard let obj = try JSONSerialization.jsonObject(with: Data(jsonText.utf8)) as? [String: Any],
-              let result = obj["result"] as? [String: Any],
-              let content = result["content"] as? [[String: Any]],
-              let text = content.first?["text"] as? String
-        else { throw CraftError.badResponse }
+        // Scan every SSE event, most recent first, and use whichever one
+        // actually has the `result`/`content` shape — not a fixed position.
+        // An earlier version of this assumed the events were "one
+        // intermediate, one final" and took .last unconditionally, but that
+        // just swapped which position could be wrong: a stream can also
+        // carry a heartbeat/ping frame *after* the real result, which would
+        // make .last wrong the same way .first was. Checking every
+        // candidate for the actual expected shape — instead of guessing by
+        // position — is what's actually reliable. Confirmed live: Brandon
+        // added a task from the floating "+" button, it reached Craft
+        // correctly (visible there, right place, right due date), but the
+        // app still threw "Unexpected response from Craft" even after the
+        // .last fix — same underlying instability, different position.
+        for jsonText in candidates.reversed() {
+            guard let obj = try? JSONSerialization.jsonObject(with: Data(jsonText.utf8)) as? [String: Any],
+                  let result = obj["result"] as? [String: Any],
+                  let content = result["content"] as? [[String: Any]],
+                  let text = content.first?["text"] as? String
+            else { continue }
 
-        if (result["isError"] as? Bool) == true {
-            throw CraftError.tool(text.components(separatedBy: "\n").first ?? text)
+            if (result["isError"] as? Bool) == true {
+                throw CraftError.tool(text.components(separatedBy: "\n").first ?? text)
+            }
+            return text
         }
-        return text
+        // Diagnostic-only capture, no behavior change — Brandon reported
+        // "Unexpected response from Craft" still happening specifically for
+        // new tasks (not Quick Capture, not Rocks), even after the SSE
+        // multi-event fix above. Since call() is shared by all three, the
+        // remaining bug is more likely in addTask's own extra parsing
+        // (appendBlocksReturningId's diff.after[0].id lookup) than here —
+        // but there's no way to tell without seeing the actual raw response
+        // that triggered it, and this MCP transport's SSE framing can't be
+        // reproduced by calling Craft any other way. Writes the exact bytes
+        // that failed to parse so the next real failure is inspectable
+        // instead of guessed at again.
+        Self.logParseFailure(command: command, raw: raw)
+        throw CraftError.badResponse
+    }
+
+    /// See the comment above the only call site. Overwrites each time —
+    /// this only needs to capture the most recent failure, not a history.
+    private static func logParseFailure(command: String, raw: String) {
+        let entry = "[\(Date())] command: \(command)\n\n\(raw)\n"
+        try? entry.write(to: Config.supportDir.appendingPathComponent("craft_debug_last_failure.txt"),
+                          atomically: true, encoding: .utf8)
     }
 
     // MARK: - Tasks
@@ -116,28 +139,65 @@ public struct CraftClient {
             return
         }
 
+        // Destination task-adds are a two-step chain (append, then update
+        // for schedule/deadline) — each step is its own network round trip
+        // with its own raw response. Logging only the step that happens to
+        // throw loses the other step's body, and the append (where the id
+        // comes from) is the more likely culprit even when the update is
+        // what actually throws. So both raw bodies are captured into one
+        // trace as they come in and written out together — always on
+        // failure, whichever step fails — rather than each step logging in
+        // isolation and overwriting the other.
         let taskMarkdown = "- [ ] " + markdown
-        let newId = try await appendBlocksReturningId(pageId: destinationBlockId, markdown: taskMarkdown)
-        guard schedule != nil || deadline != nil else { return }
-        var update = "tasks update --id \(newId)"
-        if let schedule { update += " --schedule \(schedule)" }
-        if let deadline { update += " --deadline \(deadline)" }
-        _ = try await call(tool: "craft_write", command: update)
+        let appendCommand = "blocks add --id \(destinationBlockId) --markdown \(Self.craftQuote(taskMarkdown)) --position end"
+        var rawUpdate: String?
+        var updateCommand: String?
+        do {
+            let rawAppend = try await call(tool: "craft_write", command: appendCommand)
+            guard let obj = try? JSONSerialization.jsonObject(with: Data(rawAppend.utf8)) as? [String: Any],
+                  let diff = obj["diff"] as? [String: Any],
+                  let after = diff["after"] as? [[String: Any]],
+                  let newId = after.first?["id"] as? String else {
+                Self.logTaskAddTrace(appendCommand: appendCommand, rawAppend: rawAppend,
+                                      updateCommand: nil, rawUpdate: nil)
+                throw CraftError.badResponse
+            }
+            guard schedule != nil || deadline != nil else { return }
+            var update = "tasks update --id \(newId)"
+            if let schedule { update += " --schedule \(schedule)" }
+            if let deadline { update += " --deadline \(deadline)" }
+            updateCommand = update
+            rawUpdate = try await call(tool: "craft_write", command: update)
+        } catch {
+            Self.logTaskAddTrace(appendCommand: appendCommand, rawAppend: nil,
+                                  updateCommand: updateCommand, rawUpdate: rawUpdate)
+            throw error
+        }
     }
 
-    /// Same as `appendBlocks`, but parses the new block's ID out of the
-    /// response instead of discarding it.
-    private func appendBlocksReturningId(pageId: String, markdown: String) async throws -> String {
-        let quoted = Self.craftQuote(markdown)
-        let text = try await call(tool: "craft_write",
-                                  command: "blocks add --id \(pageId) --markdown \(quoted) --position end")
-        guard let obj = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
-              let diff = obj["diff"] as? [String: Any],
-              let after = diff["after"] as? [[String: Any]],
-              let id = after.first?["id"] as? String else {
-            throw CraftError.badResponse
+    /// See the comment above the only call site. Overwrites each time —
+    /// captures whichever leg(s) of the append→update chain actually ran
+    /// before the failure, so both are visible together instead of just
+    /// the one that happened to throw.
+    private static func logTaskAddTrace(appendCommand: String, rawAppend: String?,
+                                         updateCommand: String?, rawUpdate: String?) {
+        var entry = "[\(Date())] task-add trace\n\nappend command: \(appendCommand)\n"
+        entry += "append response: \(rawAppend ?? "(not captured — call() already logged its own failure above)")\n\n"
+        if let updateCommand {
+            entry += "update command: \(updateCommand)\n"
+            entry += "update response: \(rawUpdate ?? "(threw before returning — see the other debug file, craft_debug_last_failure.txt)")\n"
+        } else {
+            entry += "(no update step reached)\n"
         }
-        return id
+        // Deliberately a separate file from craft_debug_last_failure.txt —
+        // call() writes that one from *inside* this same failure (when the
+        // failure is a generic SSE-parse miss), and this trace is written
+        // from the catch block wrapping it. Sharing one filename would mean
+        // whichever write happens second clobbers the other's detail,
+        // exactly the "lost the other step's body" problem this exists to
+        // avoid.
+        try? entry.write(to: Config.supportDir.appendingPathComponent("craft_debug_task_trace.txt"),
+                          atomically: true, encoding: .utf8)
     }
 
     /// Fetches a block's `craftdocs://open?...` deep link on demand (used by
@@ -236,6 +296,21 @@ public struct CraftClient {
         return Self.parseBlocks(text)
     }
 
+    /// A document's own direct sub-pages (nested `type: "page"` blocks) —
+    /// `documents list` never surfaces these, since Craft's document tree
+    /// only contains top-level, folder-organized documents; a sub-page is
+    /// just a block living inside its parent's content, invisible to that
+    /// command at any depth (confirmed live: `documents list --filter`
+    /// against a known sub-page title, "1:1s", returned nothing). `--depth
+    /// 1` keeps this to one level — Brandon: "99 times out of 100 I will
+    /// know the parent page," so Quick Capture's destination search finds
+    /// the parent by name as before, and this just lists what's directly
+    /// inside it, not a recursive crawl of the whole space.
+    public func subPages(of rootBlockId: String) async throws -> [CraftBlock] {
+        let text = try await call(tool: "craft_read", command: "blocks get \(rootBlockId) --depth 1 --format json")
+        return Self.parseBlocks(text, typeFilter: "page")
+    }
+
     /// Same shape as `pageBlocks`, but for the date-keyed daily note rather
     /// than a resolved rootBlockId.
     private func dailyNoteBlocks(day: String) async throws -> [CraftBlock] {
@@ -257,13 +332,14 @@ public struct CraftClient {
         }
     }
 
-    private static func parseBlocks(_ text: String) -> [CraftBlock] {
+    private static func parseBlocks(_ text: String, typeFilter: String? = nil) -> [CraftBlock] {
         guard let obj = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
               let data = obj["data"] as? [[String: Any]],
               let content = data.first?["content"] as? [[String: Any]]
         else { return [] }
         return content.compactMap { block in
             guard let id = block["id"] as? String, let md = block["markdown"] as? String else { return nil }
+            if let typeFilter, block["type"] as? String != typeFilter { return nil }
             return CraftBlock(id: id, markdown: md)
         }
     }

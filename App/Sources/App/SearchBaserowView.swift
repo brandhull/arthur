@@ -44,10 +44,10 @@ struct SearchBaserowView: View {
         #endif
     }
 
-    /// Matches the nav dropdown's own font, not just its height — Brandon
-    /// asked for these to be its visual sibling ("same dimensions as the
-    /// navigation dropdown"), and AgendaView.tabDropdown's label is
-    /// Theme.serif at tabFontSize, so this mirrors that exactly rather than
+    /// Matches the nav dropdown's own font size, not just its height —
+    /// Brandon asked for these to be its visual sibling ("same dimensions
+    /// as the navigation dropdown"), and AgendaView.tabDropdown's label is
+    /// system font at tabFontSize, so this mirrors that exactly rather than
     /// just borrowing the box shape.
     private var dropdownFontSize: CGFloat {
         #if os(iOS)
@@ -86,13 +86,13 @@ struct SearchBaserowView: View {
                     DropdownButton(
                         items: sortedDatabases, label: { $0.name }, selection: $selectedDatabase,
                         placeholder: "Database", scheme: effectiveScheme,
-                        font: Theme.serif(dropdownFontSize, weight: Theme.headingWeight), height: dropdownHeight
+                        font: .system(size: dropdownFontSize, weight: Theme.headingWeight), height: dropdownHeight
                     )
                     DropdownButton(
                         items: sortedTables, label: { $0.name }, selection: $selectedTable,
-                        placeholder: selectedDatabase == nil ? "Select a database first" : "Table",
+                        placeholder: selectedDatabase == nil ? "Select database" : "Table",
                         scheme: effectiveScheme,
-                        font: Theme.serif(dropdownFontSize, weight: Theme.headingWeight), height: dropdownHeight,
+                        font: .system(size: dropdownFontSize, weight: Theme.headingWeight), height: dropdownHeight,
                         disabled: selectedDatabase == nil || isLoadingTables
                     )
                 }
