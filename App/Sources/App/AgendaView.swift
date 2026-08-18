@@ -58,6 +58,15 @@ struct AgendaView: View {
         #endif
     }
 
+    /// See the comment on the icon HStack that uses this.
+    private var iconSpacing: CGFloat {
+        #if os(macOS)
+        return 10
+        #else
+        return 20
+        #endif
+    }
+
     private var tabFontSize: CGFloat {
         #if os(iOS)
         // 12 on compact (iPhone) used to be sized to fit 4-5 tab labels
@@ -209,7 +218,13 @@ struct AgendaView: View {
             // versa). Each icon also gets an explicit 44x44 tap target
             // (Apple's minimum recommended size) rather than just the bare
             // glyph's own small bounding box.
-            HStack(spacing: 20) {
+            //
+            // Mac gets its own tighter value (10, half of iOS's 20) — the
+            // pin/gear pair there doesn't have the fat-finger problem this
+            // spacing was originally sized for (Mac has no touch targets to
+            // avoid overlapping), and Brandon flagged the pin as reading too
+            // far from the gear at the shared 20pt spacing.
+            HStack(spacing: iconSpacing) {
                 #if os(iOS)
                 Button {
                     // Universal link, not the calshow:// scheme — Google
