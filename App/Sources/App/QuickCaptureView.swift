@@ -28,6 +28,11 @@ struct QuickCaptureView: View {
     @State private var selectedDoc: CraftDocument?
     @State private var isCraftSubmitting = false
     @State private var craftErrorMessage: String?
+    // Default on — Brandon: he adds this after nearly every Craft capture
+    // by hand today (Departmental Meetings/1:1s sub-pages), so this saves
+    // the manual markdown/after-the-fact edit in the common case rather
+    // than making it an opt-in extra step.
+    @State private var addSeparator = true
 
     // MARK: Sub-page picker (see loadSubPages)
     @State private var subPages: [CraftClient.CraftBlock] = []
@@ -158,16 +163,6 @@ struct QuickCaptureView: View {
                         // No space between ] and ( — a space there breaks
                         // the link syntax.
                         Text(verbatim: "[link text](URL)")
-                        // Not "*** = Separator" — verified live against
-                        // Craft: three asterisks round-trips to
-                        // lineStyle "extraLight", not "regular", despite
-                        // Craft's own docs/assistant claiming --- or ***
-                        // default to regular. Five asterisks is what
-                        // actually produces "regular" (confirmed both by
-                        // testing a real write and by checking existing
-                        // separator blocks already in Brandon's own Craft
-                        // data — every one of them is "*****").
-                        Text(verbatim: "***** = Separator")
                     }
                     .font(.system(size: inputFontSize))
                     .foregroundStyle(Theme.secondaryText(effectiveScheme))
@@ -278,6 +273,16 @@ struct QuickCaptureView: View {
             }
         }
 
+        // Craft-only — Baserow rows have no markdown/separator concept.
+        // Brandon adds a "*****" (regular-style) separator after nearly
+        // every Craft capture by hand, specifically for readability on the
+        // Departmental Meetings/1:1s sub-pages — this saves that manual
+        // step, on by default since that's his common case.
+        Toggle("Add Separator", isOn: $addSeparator)
+            .font(.system(size: inputFontSize))
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+
         if let craftErrorMessage {
             Text(craftErrorMessage)
                 .foregroundStyle(.red)
@@ -305,15 +310,24 @@ struct QuickCaptureView: View {
         guard let selectedDoc else { return }
         isCraftSubmitting = true
         let client = CraftClient(url: store.config.craftLink)
+        // Blank line before the ***** — not appended directly onto the
+        // last line — so Craft's markdown parser reads it as its own
+        // separator block rather than folding it into the capture's last
+        // paragraph/list item. Five asterisks, not three: verified live
+        // against Craft that "***" round-trips to lineStyle "extraLight",
+        // not "regular" — see the QuickCapture ghost-text comment history
+        // (removed above) for the full verification.
+        let markdown = addSeparator ? craftText + "\n\n*****" : craftText
         Task {
             do {
-                try await client.appendBlocks(pageId: selectedDoc.id, markdown: craftText)
+                try await client.appendBlocks(pageId: selectedDoc.id, markdown: markdown)
                 documentStore.markUsed(selectedDoc.id)
                 isCraftSubmitting = false
                 craftText = ""
                 query = ""
                 self.selectedDoc = nil
                 subPages = []
+                addSeparator = true
             } catch {
                 craftErrorMessage = error.localizedDescription
                 isCraftSubmitting = false
