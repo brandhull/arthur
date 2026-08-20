@@ -59,7 +59,17 @@ public struct CraftClient {
                 .filter { $0.hasPrefix("data: ") }
                 .map { String($0.dropFirst(6)) }
         }
-        guard !candidates.isEmpty else { throw CraftError.badResponse }
+        // Same diagnostic capture as the exhausted-candidates throw below —
+        // this is a distinct empty-body/no-SSE-lines-at-all case that was
+        // missing it. Brandon's task-add trace showed this throw fired
+        // (append response logged as "not captured") but
+        // craft_debug_last_failure.txt never appeared, because this guard
+        // threw badResponse without ever calling logParseFailure — the only
+        // covered throw site was the one at the bottom of this function.
+        guard !candidates.isEmpty else {
+            Self.logParseFailure(command: command, raw: raw)
+            throw CraftError.badResponse
+        }
 
         // Scan every SSE event, most recent first, and use whichever one
         // actually has the `result`/`content` shape — not a fixed position.
