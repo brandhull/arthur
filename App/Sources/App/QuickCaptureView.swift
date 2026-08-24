@@ -15,6 +15,10 @@ enum QuickCaptureSource: String, CaseIterable, Identifiable, Hashable {
 struct QuickCaptureView: View {
     @ObservedObject var store: TaskStore
     @ObservedObject var documentStore: DocumentStore
+    @EnvironmentObject var draft: QuickCaptureDraft
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
     @Environment(\.colorScheme) private var systemScheme
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -23,16 +27,14 @@ struct QuickCaptureView: View {
     @State private var source: QuickCaptureSource = .craft
 
     // MARK: Craft state
-    @State private var craftText = ""
+    // craftText/addSeparator used to be local @State here — now they live
+    // on the shared `draft` (QuickCaptureDraft) instead, so the Mac-only
+    // pop-out window (QuickCapturePopoutView) shows/edits the exact same
+    // in-progress text rather than a copy that has to be synced.
     @State private var query = ""
     @State private var selectedDoc: CraftDocument?
     @State private var isCraftSubmitting = false
     @State private var craftErrorMessage: String?
-    // Default on — Brandon: he adds this after nearly every Craft capture
-    // by hand today (Departmental Meetings/1:1s sub-pages), so this saves
-    // the manual markdown/after-the-fact edit in the common case rather
-    // than making it an opt-in extra step.
-    @State private var addSeparator = true
 
     // MARK: Sub-page picker (see loadSubPages)
     @State private var subPages: [CraftClient.CraftBlock] = []
@@ -128,7 +130,7 @@ struct QuickCaptureView: View {
     private var craftSection: some View {
         FieldBox(scheme: effectiveScheme) {
             ZStack(alignment: .topLeading) {
-                if craftText.isEmpty {
+                if draft.text.isEmpty {
                     // A quick-reference cheat sheet for the markdown syntax
                     // Craft itself understands, not just a generic
                     // placeholder — Brandon: this is specifically to help
@@ -173,7 +175,7 @@ struct QuickCaptureView: View {
                     .padding(12)
                     .allowsHitTesting(false)
                 }
-                TextEditor(text: $craftText)
+                TextEditor(text: $draft.text)
                     .font(.system(size: inputFontSize))
                     .scrollContentBackground(.hidden)
                             .background(Color.clear) // macOS TextEditor keeps its own NSTextView background even with scrollContentBackground(.hidden) — this forces it transparent so FieldBox's own fill actually shows through, instead of a generic system gray that ignored Navy/Charcoal entirely.
@@ -184,6 +186,26 @@ struct QuickCaptureView: View {
                     .frame(minHeight: 120)
             }
         }
+        #if os(macOS)
+        // Mac-only "break out into its own window" affordance — see
+        // QuickCapturePopoutView. Overlaid on the box itself rather than
+        // living in a header row, so it stays visually attached to the
+        // exact content it expands.
+        .overlay(alignment: .topTrailing) {
+            Button {
+                openWindow(id: "quickCapturePopout")
+            } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.secondaryText(effectiveScheme))
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Open in a separate window")
+            .padding(6)
+        }
+        #endif
         .padding(.top, 16)
 
         // Bumped from 4 — Brandon: it read as too close to the Capture box
@@ -282,7 +304,7 @@ struct QuickCaptureView: View {
         // every Craft capture by hand, specifically for readability on the
         // Departmental Meetings/1:1s sub-pages — this saves that manual
         // step, on by default since that's his common case.
-        Toggle("Add Separator", isOn: $addSeparator)
+        Toggle("Add Separator", isOn: $draft.addSeparator)
             .font(.system(size: inputFontSize))
             .padding(.horizontal, 20)
             .padding(.top, 12)
@@ -303,7 +325,7 @@ struct QuickCaptureView: View {
             PillButton(systemImage: "arrow.up.circle", label: isCraftSubmitting ? "Saving…" : "Save") {
                 submitCraft()
             }
-            .disabled(craftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            .disabled(draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                       || selectedDoc == nil || isCraftSubmitting)
         }
         .padding(.horizontal, 20)
@@ -321,17 +343,17 @@ struct QuickCaptureView: View {
         // against Craft that "***" round-trips to lineStyle "extraLight",
         // not "regular" — see the QuickCapture ghost-text comment history
         // (removed above) for the full verification.
-        let markdown = addSeparator ? craftText + "\n\n*****" : craftText
+        let markdown = draft.addSeparator ? draft.text + "\n\n*****" : draft.text
         Task {
             do {
                 try await client.appendBlocks(pageId: selectedDoc.id, markdown: markdown)
                 documentStore.markUsed(selectedDoc.id)
                 isCraftSubmitting = false
-                craftText = ""
+                draft.text = ""
                 query = ""
                 self.selectedDoc = nil
                 subPages = []
-                addSeparator = true
+                draft.addSeparator = true
             } catch {
                 craftErrorMessage = error.localizedDescription
                 isCraftSubmitting = false
