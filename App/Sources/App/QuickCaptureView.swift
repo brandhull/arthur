@@ -101,6 +101,26 @@ struct QuickCaptureView: View {
                         selection: $source, scheme: effectiveScheme, fontSize: filterFontSize
                     )
                     Spacer()
+                    #if os(macOS)
+                    // Same row as the Craft/Baserow filter, not overlaid on
+                    // the capture box itself — Brandon: overlaid on the box
+                    // it clipped against the box's own rounded border.
+                    // Craft-only, since the pop-out has nothing to do with
+                    // a Baserow row.
+                    if source == .craft {
+                        Button {
+                            openWindow(id: "quickCapturePopout")
+                        } label: {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.system(size: 14))
+                                .foregroundStyle(Theme.secondaryText(effectiveScheme))
+                                .frame(width: 28, height: 28)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Open in a separate window")
+                    }
+                    #endif
                 }
                 .padding(.horizontal, 20)
                 .frame(height: Theme.headerRowHeight)
@@ -186,26 +206,6 @@ struct QuickCaptureView: View {
                     .frame(minHeight: 120)
             }
         }
-        #if os(macOS)
-        // Mac-only "break out into its own window" affordance — see
-        // QuickCapturePopoutView. Overlaid on the box itself rather than
-        // living in a header row, so it stays visually attached to the
-        // exact content it expands.
-        .overlay(alignment: .topTrailing) {
-            Button {
-                openWindow(id: "quickCapturePopout")
-            } label: {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.secondaryText(effectiveScheme))
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("Open in a separate window")
-            .padding(6)
-        }
-        #endif
         .padding(.top, 16)
 
         // Bumped from 4 — Brandon: it read as too close to the Capture box

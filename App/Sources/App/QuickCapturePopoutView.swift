@@ -82,6 +82,18 @@ struct QuickCapturePopoutView: View {
         .frame(minWidth: 360, minHeight: 240)
         .background(Theme.background(effectiveScheme))
         .foregroundStyle(Theme.primary(effectiveScheme))
+        // Without this, the pop-out's actual AppKit window appearance never
+        // gets told to go dark — it was left following the OS default,
+        // independent of Config.appearance/effectiveScheme. That's harmless
+        // for colors defined as plain RGB (Theme.background/primary), but
+        // Theme.secondaryText resolves to the *dynamic* system color
+        // NSColor.secondaryLabelColor, which reads the window's real
+        // appearance, not this computed effectiveScheme — so the unpinned
+        // mappin (secondaryText) rendered as light-mode's dark gray against
+        // this manually-forced-dark background and was nearly invisible.
+        // Every other window in the app gets this from AgendaView/the
+        // various sheets; the pop-out just never had it.
+        .preferredColorScheme(effectiveScheme)
         .pinnedOnTop(pinned)
         .restoresFrame(named: "quickCapturePopout")
     }
