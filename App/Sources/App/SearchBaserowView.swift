@@ -113,14 +113,7 @@ struct SearchBaserowView: View {
                                 .padding(12)
                                 .allowsHitTesting(false)
                         }
-                        TextEditor(text: $query)
-                            .font(.system(size: inputFontSize))
-                            .scrollContentBackground(.hidden)
-                            .background(Color.clear)
-                            .padding(.top, 12)
-                            .padding(.bottom, 12)
-                            .padding(.trailing, 12)
-                            .padding(.leading, 7)
+                        PlainTextEditor(text: $query, fontSize: inputFontSize, scheme: effectiveScheme)
                             .frame(minHeight: 60)
                     }
                 }

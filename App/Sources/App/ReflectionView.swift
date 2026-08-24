@@ -66,14 +66,7 @@ struct ReflectionView: View {
             // comment for the full reasoning.
             ContentBox(scheme: effectiveScheme) {
                 if isEditing {
-                    TextEditor(text: $draftContent)
-                        .font(.system(size: inputFontSize))
-                        .scrollContentBackground(.hidden)
-                            .background(Color.clear) // macOS TextEditor keeps its own NSTextView background even with scrollContentBackground(.hidden) — this forces it transparent so FieldBox's own fill actually shows through, instead of a generic system gray that ignored Navy/Charcoal entirely.
-                        .padding(.top, 12)
-                        .padding(.bottom, 12)
-                        .padding(.trailing, 12)
-                        .padding(.leading, 7)
+                    PlainTextEditor(text: $draftContent, fontSize: inputFontSize, scheme: effectiveScheme)
                 } else {
                     ScrollView {
                         if store.dailyNoteContent.isEmpty {

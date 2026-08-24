@@ -52,22 +52,7 @@ struct AddNoteSheet: View {
                                 .padding(12)
                                 .allowsHitTesting(false)
                         }
-                        TextEditor(text: $text)
-                            .font(.system(size: inputFontSize))
-                            .scrollContentBackground(.hidden)
-                            .background(Color.clear) // macOS TextEditor keeps its own NSTextView background even with scrollContentBackground(.hidden) — this forces it transparent so FieldBox's own fill actually shows through, instead of a generic system gray that ignored Navy/Charcoal entirely.
-                            // Leading is 12 minus 5: TextEditor bakes in a
-                            // fixed 5pt lineFragmentPadding on both platforms
-                            // that a plain Text has no equivalent of, so
-                            // giving it the same 12 as the placeholder would
-                            // put the actual cursor/typed-text position 5pt
-                            // to the right of the placeholder's "N". This
-                            // keeps the cursor flush with the placeholder
-                            // without touching the placeholder's own padding.
-                            .padding(.top, 12)
-                            .padding(.bottom, 12)
-                            .padding(.trailing, 12)
-                            .padding(.leading, 7)
+                        PlainTextEditor(text: $text, fontSize: inputFontSize, scheme: effectiveScheme)
                             .frame(minHeight: 160)
                     }
                 }

@@ -195,14 +195,7 @@ struct QuickCaptureView: View {
                     .padding(12)
                     .allowsHitTesting(false)
                 }
-                TextEditor(text: $draft.text)
-                    .font(.system(size: inputFontSize))
-                    .scrollContentBackground(.hidden)
-                            .background(Color.clear) // macOS TextEditor keeps its own NSTextView background even with scrollContentBackground(.hidden) — this forces it transparent so FieldBox's own fill actually shows through, instead of a generic system gray that ignored Navy/Charcoal entirely.
-                    .padding(.top, 12)
-                    .padding(.bottom, 12)
-                    .padding(.trailing, 12)
-                    .padding(.leading, 7)
+                PlainTextEditor(text: $draft.text, fontSize: inputFontSize, scheme: effectiveScheme)
                     .frame(minHeight: 120)
             }
         }
@@ -467,14 +460,7 @@ struct QuickCaptureView: View {
         case "long_text":
             FieldLabel(title: field.name)
             FieldBox(scheme: effectiveScheme) {
-                TextEditor(text: textBinding(field.id))
-                    .font(.system(size: inputFontSize))
-                    .scrollContentBackground(.hidden)
-                            .background(Color.clear) // macOS TextEditor keeps its own NSTextView background even with scrollContentBackground(.hidden) — this forces it transparent so FieldBox's own fill actually shows through, instead of a generic system gray that ignored Navy/Charcoal entirely.
-                    .padding(.top, 12)
-                    .padding(.bottom, 12)
-                    .padding(.trailing, 12)
-                    .padding(.leading, 7)
+                PlainTextEditor(text: textBinding(field.id), fontSize: inputFontSize, scheme: effectiveScheme)
                     .frame(minHeight: 80)
             }
 

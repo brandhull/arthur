@@ -71,18 +71,7 @@ struct RocksView: View {
             // inconsistent once compared side by side.
             ContentBox(scheme: effectiveScheme) {
                 if isEditing {
-                    TextEditor(text: $draftContent)
-                        .font(.system(size: inputFontSize))
-                        .scrollContentBackground(.hidden)
-                            .background(Color.clear) // macOS TextEditor keeps its own NSTextView background even with scrollContentBackground(.hidden) — this forces it transparent so FieldBox's own fill actually shows through, instead of a generic system gray that ignored Navy/Charcoal entirely.
-                        // Leading is 12 minus 5 to offset TextEditor's own
-                        // built-in lineFragmentPadding — same fix as every
-                        // other TextEditor in the app, keeps the cursor
-                        // flush with where typed text visually starts.
-                        .padding(.top, 12)
-                        .padding(.bottom, 12)
-                        .padding(.trailing, 12)
-                        .padding(.leading, 7)
+                    PlainTextEditor(text: $draftContent, fontSize: inputFontSize, scheme: effectiveScheme)
                 } else {
                     ScrollView {
                         if store.rocksContent.isEmpty {
