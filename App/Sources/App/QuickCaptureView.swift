@@ -156,7 +156,11 @@ struct QuickCaptureView: View {
                         // real styled link — exactly backwards from showing
                         // the raw syntax as an example. verbatim forces it
                         // to display literally instead.
-                        Text(verbatim: "# Heading")
+                        // "##", not "#" — a Craft doc's own title already
+                        // renders as H1, so a capture landing inside it
+                        // should default to H2 as the example, not compete
+                        // with the page title's own size.
+                        Text(verbatim: "## Heading")
                         Text(verbatim: "**Strong**")
                         Text(verbatim: "- [ ] Todo")
                         Text(verbatim: "- Bullet")
