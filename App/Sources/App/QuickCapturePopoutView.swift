@@ -80,14 +80,26 @@ struct QuickCapturePopoutView: View {
                     Text("Capture a note…")
                         .font(.system(size: Theme.inputFontSize()))
                         .foregroundStyle(Theme.secondaryText(effectiveScheme))
-                        .padding(16)
+                        .padding(12)
                         .allowsHitTesting(false)
                 }
+                // Same padding pattern as QuickCaptureView's Craft box and
+                // SearchBaserowView's search box — 12 on every edge except
+                // leading, which drops to 7 to compensate for TextEditor's
+                // own ~5pt internal inset that the placeholder Text doesn't
+                // have. This pop-out originally used mismatched values (16
+                // for the placeholder, a flat 12/no-compensation for the
+                // TextEditor) with no leading offset at all, which is what
+                // put the cursor visibly out of position/size relative to
+                // the placeholder — not a font-size bug, a padding bug.
                 TextEditor(text: $draft.text)
                     .font(.system(size: Theme.inputFontSize()))
                     .scrollContentBackground(.hidden)
                     .background(Color.clear)
-                    .padding(12)
+                    .padding(.top, 12)
+                    .padding(.bottom, 12)
+                    .padding(.trailing, 12)
+                    .padding(.leading, 7)
             }
         }
         .frame(minWidth: 360, minHeight: 240)
