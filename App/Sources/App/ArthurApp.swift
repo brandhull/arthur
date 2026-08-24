@@ -16,10 +16,7 @@ struct ArthurApp: App {
     }
 
     var body: some Scene {
-        // Explicit id "main" (not the default) so the pop-out's "return"
-        // button can bring it forward via openWindow(id:) rather than
-        // guessing at it via window title string matching.
-        WindowGroup(id: "main") {
+        WindowGroup {
             ContentView()
                 .environmentObject(quickCaptureDraft)
         }

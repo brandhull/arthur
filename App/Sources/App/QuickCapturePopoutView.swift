@@ -1,6 +1,7 @@
 #if os(macOS)
 import SwiftUI
 import ArthurKit
+import AppKit
 
 /// Mac-only "break out" window for Quick Capture's Craft box — a bigger,
 /// independently movable/resizable surface for taking notes during a call,
@@ -15,7 +16,6 @@ import ArthurKit
 struct QuickCapturePopoutView: View {
     @EnvironmentObject var draft: QuickCaptureDraft
     @Environment(\.dismissWindow) private var dismissWindow
-    @Environment(\.openWindow) private var openWindow
     @Environment(\.colorScheme) private var systemScheme
 
     // Defaults on, per Brandon's "the pop-out should default to always on
@@ -48,9 +48,20 @@ struct QuickCapturePopoutView: View {
                 // already shared live with the main window's Craft box.
                 // This just closes the pop-out and brings the main window
                 // forward so Brandon can pick a destination and Save there.
+                //
+                // NOT openWindow(id: "main") — that's the bug Brandon hit:
+                // openWindow(id:) on a WindowGroup always spawns a *new*
+                // window instance rather than refocusing the existing one
+                // (that "bring existing one forward" behavior only applies
+                // to the singular Window scene type, which is what the
+                // pop-out itself uses). Calling it here created a second
+                // full Arthur window, complete with its own fresh splash
+                // screen replay, every time "return" was tapped. Finding
+                // and refocusing the real window via AppKit sidesteps that
+                // entirely — no new window is ever created.
                 Button {
                     dismissWindow(id: "quickCapturePopout")
-                    openWindow(id: "main")
+                    NSApp.windows.first(where: { $0.title == "Arthur" })?.makeKeyAndOrderFront(nil)
                 } label: {
                     Image(systemName: "arrow.down.right.and.arrow.up.left")
                         .font(.system(size: 16))
