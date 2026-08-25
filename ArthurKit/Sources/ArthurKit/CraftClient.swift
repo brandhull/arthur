@@ -189,10 +189,7 @@ public struct CraftClient {
         var rawUpdate: String?
         do {
             rawAppend = try await call(tool: "craft_write", command: appendCommand)
-            guard let obj = try? JSONSerialization.jsonObject(with: Data(rawAppend!.utf8)) as? [String: Any],
-                  let diff = obj["diff"] as? [String: Any],
-                  let after = diff["after"] as? [[String: Any]],
-                  let newId = after.first?["id"] as? String else {
+            guard let newId = Self.extractNewBlockId(from: rawAppend!) else {
                 throw CraftError.badResponse
             }
             guard schedule != nil || deadline != nil else { return }
@@ -206,6 +203,37 @@ public struct CraftClient {
                                   updateCommand: updateCommand, rawUpdate: rawUpdate, caughtError: error)
             throw error
         }
+    }
+
+    /// The actual root cause of the months-long "Unexpected response from
+    /// Craft" bug on task-adding specifically, found via Brandon's
+    /// 2026-08-25 task-add trace (once the logging-clobber bug above it
+    /// was fixed enough to actually show the real text): `blocks add`'s
+    /// response was assumed to always be JSON with `diff.after[0].id`
+    /// (apparently verified live at some point), but Craft actually
+    /// returned plain text — "Added 1 block.\nIDs: <uuid>" — every single
+    /// time in the real repro. The JSON guard silently failed on that on
+    /// every task add with a destination, which is exactly the append
+    /// succeeding (task always landed correctly) while the id extraction
+    /// downstream of it always failed, so the schedule/deadline step never
+    /// ran and the whole call threw badResponse. Tries the JSON shape
+    /// first (Craft's MCP output has been unstable before — see call()'s
+    /// SSE-candidate-scanning comment — so it may sometimes actually be
+    /// JSON), falls back to the plain-text "IDs: <uuid>" shape that's
+    /// actually been observed.
+    private static func extractNewBlockId(from text: String) -> String? {
+        if let obj = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
+           let diff = obj["diff"] as? [String: Any],
+           let after = diff["after"] as? [[String: Any]],
+           let id = after.first?["id"] as? String {
+            return id
+        }
+        if let regex = try? NSRegularExpression(pattern: #"IDs:\s*<([0-9A-Za-z-]+)>"#),
+           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+           let range = Range(match.range(at: 1), in: text) {
+            return String(text[range])
+        }
+        return nil
     }
 
     /// See the comment above the only call site. Overwrites each time —
