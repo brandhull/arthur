@@ -34,7 +34,20 @@ public struct CraftClient {
         }
         var req = URLRequest(url: endpoint)
         req.httpMethod = "POST"
-        req.timeoutInterval = 30
+        // Bumped from 30 — the failure pattern Brandon reported (task
+        // always lands in Craft in the right place, error every time, due
+        // date never attaches) is the exact signature of the client giving
+        // up on a slow response after the server already did the write:
+        // the append's HTTP request succeeds server-side, but if the
+        // response takes longer than this to come back, URLSession throws
+        // a timeout before call() ever sees a body to parse — which also
+        // means addTask's follow-up "attach the schedule" step never even
+        // runs (confirmed via the task-add trace: "no update step
+        // reached"), not that it silently fails. A generous timeout is a
+        // no-risk change — it only makes the client wait longer before
+        // giving up, no different behavior if the response was already
+        // arriving inside 30s.
+        req.timeoutInterval = 60
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
         let body: [String: Any] = [
@@ -169,7 +182,7 @@ public struct CraftClient {
                   let after = diff["after"] as? [[String: Any]],
                   let newId = after.first?["id"] as? String else {
                 Self.logTaskAddTrace(appendCommand: appendCommand, rawAppend: rawAppend,
-                                      updateCommand: nil, rawUpdate: nil)
+                                      updateCommand: nil, rawUpdate: nil, caughtError: nil)
                 throw CraftError.badResponse
             }
             guard schedule != nil || deadline != nil else { return }
@@ -180,7 +193,7 @@ public struct CraftClient {
             rawUpdate = try await call(tool: "craft_write", command: update)
         } catch {
             Self.logTaskAddTrace(appendCommand: appendCommand, rawAppend: nil,
-                                  updateCommand: updateCommand, rawUpdate: rawUpdate)
+                                  updateCommand: updateCommand, rawUpdate: rawUpdate, caughtError: error)
             throw error
         }
     }
@@ -189,8 +202,21 @@ public struct CraftClient {
     /// captures whichever leg(s) of the append→update chain actually ran
     /// before the failure, so both are visible together instead of just
     /// the one that happened to throw.
+    ///
+    /// `caughtError` was missing entirely until Brandon's 2026-08-25 repro:
+    /// the trace showed "append response: not captured" with no actual
+    /// error text, because the outer catch block only logged raw bodies,
+    /// never the thrown Error itself. That gap meant a whole category of
+    /// failures was invisible — anything that throws before call() gets a
+    /// chance to log (a raw URLSession error like a timeout, or
+    /// CraftError.http), since those never touch craft_debug_last_failure.txt
+    /// either. Confirmed live: that file genuinely didn't exist on disk for
+    /// this failure, proving it wasn't a parse-failure at all. Recording
+    /// the caught error's description directly is what actually answers
+    /// "timeout vs HTTP error vs something else" going forward.
     private static func logTaskAddTrace(appendCommand: String, rawAppend: String?,
-                                         updateCommand: String?, rawUpdate: String?) {
+                                         updateCommand: String?, rawUpdate: String?,
+                                         caughtError: Error?) {
         var entry = "[\(Date())] task-add trace\n\nappend command: \(appendCommand)\n"
         entry += "append response: \(rawAppend ?? "(not captured — call() already logged its own failure above)")\n\n"
         if let updateCommand {
@@ -198,6 +224,10 @@ public struct CraftClient {
             entry += "update response: \(rawUpdate ?? "(threw before returning — see the other debug file, craft_debug_last_failure.txt)")\n"
         } else {
             entry += "(no update step reached)\n"
+        }
+        if let caughtError {
+            entry += "\ncaught error: \(caughtError)\n"
+            entry += "localizedDescription: \(caughtError.localizedDescription)\n"
         }
         // Deliberately a separate file from craft_debug_last_failure.txt —
         // call() writes that one from *inside* this same failure (when the
