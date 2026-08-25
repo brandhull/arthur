@@ -173,16 +173,26 @@ public struct CraftClient {
         // isolation and overwriting the other.
         let taskMarkdown = "- [ ] " + markdown
         let appendCommand = "blocks add --id \(destinationBlockId) --markdown \(Self.craftQuote(taskMarkdown)) --position end"
-        var rawUpdate: String?
+        // All three hoisted above the do block (not just updateCommand/
+        // rawUpdate, as before) — rawAppend used to be a `let` declared
+        // *inside* the do block, invisible to the catch below. That meant
+        // this exact guard's own failure path logged the real append
+        // response once (with the actual text), then immediately threw,
+        // landing in the outer catch which logged *again* with
+        // `rawAppend: nil` (all it could see), clobbering the first,
+        // actually-useful entry. Every trace Brandon sent showed the
+        // useless second write. One shared var + one logging call in the
+        // catch fixes it for good — whatever got populated before the
+        // throw is what gets recorded, no double-write to clobber it.
+        var rawAppend: String?
         var updateCommand: String?
+        var rawUpdate: String?
         do {
-            let rawAppend = try await call(tool: "craft_write", command: appendCommand)
-            guard let obj = try? JSONSerialization.jsonObject(with: Data(rawAppend.utf8)) as? [String: Any],
+            rawAppend = try await call(tool: "craft_write", command: appendCommand)
+            guard let obj = try? JSONSerialization.jsonObject(with: Data(rawAppend!.utf8)) as? [String: Any],
                   let diff = obj["diff"] as? [String: Any],
                   let after = diff["after"] as? [[String: Any]],
                   let newId = after.first?["id"] as? String else {
-                Self.logTaskAddTrace(appendCommand: appendCommand, rawAppend: rawAppend,
-                                      updateCommand: nil, rawUpdate: nil, caughtError: nil)
                 throw CraftError.badResponse
             }
             guard schedule != nil || deadline != nil else { return }
@@ -192,7 +202,7 @@ public struct CraftClient {
             updateCommand = update
             rawUpdate = try await call(tool: "craft_write", command: update)
         } catch {
-            Self.logTaskAddTrace(appendCommand: appendCommand, rawAppend: nil,
+            Self.logTaskAddTrace(appendCommand: appendCommand, rawAppend: rawAppend,
                                   updateCommand: updateCommand, rawUpdate: rawUpdate, caughtError: error)
             throw error
         }
