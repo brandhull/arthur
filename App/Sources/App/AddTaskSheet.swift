@@ -13,6 +13,7 @@ import ArthurKit
 /// rounding can't be made to match.
 struct AddTaskSheet: View {
     @ObservedObject var store: TaskStore
+    @ObservedObject var documentStore: DocumentStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var systemScheme
     #if os(iOS)
@@ -86,6 +87,21 @@ struct AddTaskSheet: View {
                     Button("Add") {
                         let destination = store.config.inboxes.first { $0.id == destinationId } ?? store.config.defaultInbox
                         store.addTask(text: text, dueDate: includeDueDate ? dueDate : nil, destination: destination)
+                        // Shares Quick Capture's own recents list (see
+                        // DocumentStore.markUsed) rather than tracking a
+                        // second, Add-Task-only notion of "recent" — Brandon:
+                        // Quick Capture's suggested destinations felt stale
+                        // because he'd been pushing to other documents via
+                        // Add Task instead, which never touched that list.
+                        // Fired optimistically alongside the fire-and-forget
+                        // addTask() above, not gated on its eventual
+                        // success/failure — same "dismiss immediately" spirit
+                        // this sheet already has, and the underlying append
+                        // essentially always lands (see CraftClient.addTask's
+                        // own history of this).
+                        if let destination {
+                            documentStore.markUsed(destination.id)
+                        }
                         dismiss()
                     }
                     .disabled(text.trimmingCharacters(in: .whitespaces).isEmpty)
