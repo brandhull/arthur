@@ -138,7 +138,7 @@ struct AgendaView: View {
             SettingsView(store: store)
         }
         .sheet(isPresented: $showingAddTask) {
-            AddTaskSheet(store: store, documentStore: documentStore)
+            AddTaskSheet(store: store)
         }
         .sheet(isPresented: $showingAddNote) {
             AddNoteSheet(store: store)

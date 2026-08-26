@@ -340,7 +340,16 @@ struct QuickCaptureView: View {
         Task {
             do {
                 try await client.appendBlocks(pageId: selectedDoc.id, markdown: markdown)
-                documentStore.markUsed(selectedDoc.id)
+                // Mark the top-level parent used, not the sub-page itself,
+                // when one was selected — Brandon: sub-page titles repeat
+                // across parents (many docs have their own "1:1s"), so
+                // showing one bare in the recents list would be ambiguous
+                // about which one it actually was. Top-level titles are
+                // unique enough to be unambiguous, so that's what recents
+                // shows; the sub-page pick still lands in the right place
+                // in Craft, this only affects which entry gets bumped here.
+                let idToMarkUsed = subPagesParentId ?? selectedDoc.id
+                documentStore.markUsed(idToMarkUsed)
                 isCraftSubmitting = false
                 draft.text = ""
                 query = ""
