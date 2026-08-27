@@ -1,15 +1,21 @@
 import Foundation
-import ArthurKit
+import Combine
 
 /// Caches the space's documents on disk so the floating-capture picker is
 /// instant, refreshing in the background — trimmed single-space version of
 /// craft-quick-capture's DocumentStore (no collections/multi-space, Arthur
 /// only pushes free-form text to pages).
+///
+/// Lives in ArthurKit (moved from the App target) so both the main app and
+/// ArthurBar's menu-bar Quick Capture share the exact same search/recents
+/// logic and, since both write to the same shared `Config.supportDir`
+/// files, the exact same on-disk cache and recents list too — using Quick
+/// Capture from either one keeps the other's suggestions in sync.
 @MainActor
-final class DocumentStore: ObservableObject {
-    @Published var documents: [CraftDocument] = []
-    @Published var recentIds: [String] = []
-    @Published var isRefreshing = false
+public final class DocumentStore: ObservableObject {
+    @Published public var documents: [CraftDocument] = []
+    @Published public var recentIds: [String] = []
+    @Published public var isRefreshing = false
 
     private var lastFetch: Date?
     private var cacheFile: URL { Config.supportDir.appendingPathComponent("documents.json") }
@@ -17,7 +23,7 @@ final class DocumentStore: ObservableObject {
 
     private struct Cache: Codable { var fetchedAt: Date; var docs: [CraftDocument] }
 
-    init() {
+    public init() {
         if let data = try? Data(contentsOf: cacheFile),
            let cache = try? JSONDecoder().decode(Cache.self, from: data) {
             documents = cache.docs
@@ -29,12 +35,12 @@ final class DocumentStore: ObservableObject {
         }
     }
 
-    func refreshIfStale(craftLink: String, maxAge: TimeInterval = 15 * 60) {
+    public func refreshIfStale(craftLink: String, maxAge: TimeInterval = 15 * 60) {
         if let lastFetch, Date().timeIntervalSince(lastFetch) < maxAge, !documents.isEmpty { return }
         refresh(craftLink: craftLink)
     }
 
-    func refresh(craftLink: String) {
+    public func refresh(craftLink: String) {
         guard !isRefreshing, !craftLink.isEmpty else { return }
         isRefreshing = true
         Task {
@@ -53,7 +59,7 @@ final class DocumentStore: ObservableObject {
         }
     }
 
-    func markUsed(_ id: String) {
+    public func markUsed(_ id: String) {
         recentIds.removeAll { $0 == id }
         recentIds.insert(id, at: 0)
         recentIds = Array(recentIds.prefix(8))
@@ -64,7 +70,7 @@ final class DocumentStore: ObservableObject {
 
     /// Case-insensitive, every space-separated token must appear in the title
     /// or folder. Ranking: title prefix beats title word-start beats any match.
-    func search(_ query: String, limit: Int = 8) -> [CraftDocument] {
+    public func search(_ query: String, limit: Int = 8) -> [CraftDocument] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         if q.isEmpty {
             let recents = recentIds.compactMap { id in documents.first { $0.id == id } }

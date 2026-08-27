@@ -6,8 +6,10 @@ import Carbon.HIToolbox
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
-    private var hotKey: HotKey?
-    private var panel: NSPanel?
+    private var addTaskHotKey: HotKey?
+    private var addTaskPanel: NSPanel?
+    private var quickCaptureHotKey: HotKey?
+    private var quickCapturePanel: NSPanel?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -19,22 +21,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // ⌥⌘A by default — distinct from craft-quick-capture's ⌥⌘Space so both
         // menu bar apps can run side by side without a shortcut collision.
-        hotKey = HotKey(keyCode: 0, modifiers: UInt32(cmdKey | optionKey)) { [weak self] in
-            self?.togglePanel()
+        addTaskHotKey = HotKey(keyCode: 0, modifiers: UInt32(cmdKey | optionKey)) { [weak self] in
+            self?.toggleAddTaskPanel()
+        }
+        // ⌥⌘C ("Capture") — a second, separate hotkey/popup rather than
+        // folding this into Quick Add with a mode switch: Brandon still
+        // uses task quick-add regularly, so each stays focused on one job.
+        // keyCode 8 = 'C'. Also distinct from craft-quick-capture's
+        // ⌥⌘Space, same reasoning as above.
+        quickCaptureHotKey = HotKey(keyCode: 8, modifiers: UInt32(cmdKey | optionKey)) { [weak self] in
+            self?.toggleQuickCapturePanel()
         }
     }
 
-    private func togglePanel() {
-        if let panel, panel.isVisible {
-            panel.orderOut(nil)
+    private func toggleAddTaskPanel() {
+        if let addTaskPanel, addTaskPanel.isVisible {
+            addTaskPanel.orderOut(nil)
             return
         }
-        showPanel()
+        showAddTaskPanel()
     }
 
-    private func showPanel() {
-        if panel == nil {
-            let view = QuickAddView(onSubmit: { [weak self] in self?.panel?.orderOut(nil) })
+    private func showAddTaskPanel() {
+        if addTaskPanel == nil {
+            let view = QuickAddView(onSubmit: { [weak self] in self?.addTaskPanel?.orderOut(nil) })
             let hosting = NSHostingController(rootView: view)
             let p = NSPanel(contentViewController: hosting)
             p.styleMask = [.titled, .closable, .nonactivatingPanel]
@@ -42,23 +52,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             p.isFloatingPanel = true
             p.level = .floating
             p.setContentSize(NSSize(width: 380, height: 200))
-            panel = p
+            addTaskPanel = p
         }
         NSApp.activate(ignoringOtherApps: true)
-        panel?.center()
-        panel?.makeKeyAndOrderFront(nil)
+        addTaskPanel?.center()
+        addTaskPanel?.makeKeyAndOrderFront(nil)
+    }
+
+    private func toggleQuickCapturePanel() {
+        if let quickCapturePanel, quickCapturePanel.isVisible {
+            quickCapturePanel.orderOut(nil)
+            return
+        }
+        showQuickCapturePanel()
+    }
+
+    private func showQuickCapturePanel() {
+        if quickCapturePanel == nil {
+            let view = QuickCaptureBarView(onSubmit: { [weak self] in self?.quickCapturePanel?.orderOut(nil) })
+            let hosting = NSHostingController(rootView: view)
+            let p = NSPanel(contentViewController: hosting)
+            p.styleMask = [.titled, .closable, .nonactivatingPanel]
+            p.title = "Quick Capture"
+            p.isFloatingPanel = true
+            p.level = .floating
+            p.setContentSize(NSSize(width: 380, height: 340))
+            quickCapturePanel = p
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        quickCapturePanel?.center()
+        quickCapturePanel?.makeKeyAndOrderFront(nil)
     }
 
     private func buildMenu() -> NSMenu {
         let menu = NSMenu()
-        let add = NSMenuItem(title: "Quick Add…", action: #selector(openPanel), keyEquivalent: "a")
+        let add = NSMenuItem(title: "Quick Add…", action: #selector(openAddTaskPanel), keyEquivalent: "a")
         add.keyEquivalentModifierMask = [.command, .option]
         add.target = self
         menu.addItem(add)
+        let capture = NSMenuItem(title: "Quick Capture…", action: #selector(openQuickCapturePanel), keyEquivalent: "c")
+        capture.keyEquivalentModifierMask = [.command, .option]
+        capture.target = self
+        menu.addItem(capture)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Arthur Bar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         return menu
     }
 
-    @objc private func openPanel() { showPanel() }
+    @objc private func openAddTaskPanel() { showAddTaskPanel() }
+    @objc private func openQuickCapturePanel() { showQuickCapturePanel() }
 }
