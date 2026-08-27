@@ -46,12 +46,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if addTaskPanel == nil {
             let view = QuickAddView(onSubmit: { [weak self] in self?.addTaskPanel?.orderOut(nil) })
             let hosting = NSHostingController(rootView: view)
+            // Lets the panel track the SwiftUI content's own ideal height
+            // instead of a fixed size — without this, showing the due-date
+            // picker (an extra row) had nowhere to go inside the fixed
+            // 380x200 frame, so it just compressed everything including
+            // the padding below the Add button, leaving it flush against
+            // the window's bottom edge. QuickAddView's own .fixedSize(...)
+            // is what makes it report a real height for this to follow.
+            hosting.sizingOptions = [.preferredContentSize]
             let p = NSPanel(contentViewController: hosting)
             p.styleMask = [.titled, .closable, .nonactivatingPanel]
             p.title = "Quick Task"
             p.isFloatingPanel = true
             p.level = .floating
-            p.setContentSize(NSSize(width: 380, height: 200))
             addTaskPanel = p
         }
         NSApp.activate(ignoringOtherApps: true)

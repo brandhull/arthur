@@ -52,6 +52,19 @@ struct QuickAddView: View {
             }
         }
         .padding()
+        // Extra breathing room specifically under the Add button — the
+        // uniform .padding() above already covers the other three edges,
+        // but the button sat flush against the window's bottom border
+        // (see AppDelegate's sizingOptions comment for the sizing half of
+        // this fix).
+        .padding(.bottom, 8)
+        // Reports this view's actual height to the hosting NSPanel (via
+        // NSHostingController.sizingOptions in AppDelegate) instead of
+        // stretching to fill whatever frame it's given — this is what lets
+        // the panel grow when the due-date picker appears and shrink back
+        // when it's hidden, rather than clipping into a fixed size.
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 340)
         .onAppear { config = Config.load() }
     }
 
