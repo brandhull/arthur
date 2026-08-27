@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.autosaveName = "ArthurBar"
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "checklist", accessibilityDescription: "Arthur Quick Add")
+            button.image = NSImage(systemSymbolName: "checklist", accessibilityDescription: "Arthur Quick Task")
         }
         statusItem.menu = buildMenu()
 
@@ -48,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let hosting = NSHostingController(rootView: view)
             let p = NSPanel(contentViewController: hosting)
             p.styleMask = [.titled, .closable, .nonactivatingPanel]
-            p.title = "Add to Arthur"
+            p.title = "Quick Task"
             p.isFloatingPanel = true
             p.level = .floating
             p.setContentSize(NSSize(width: 380, height: 200))
@@ -86,7 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildMenu() -> NSMenu {
         let menu = NSMenu()
-        let add = NSMenuItem(title: "Quick Add…", action: #selector(openAddTaskPanel), keyEquivalent: "a")
+        let add = NSMenuItem(title: "Quick Task…", action: #selector(openAddTaskPanel), keyEquivalent: "a")
         add.keyEquivalentModifierMask = [.command, .option]
         add.target = self
         menu.addItem(add)
