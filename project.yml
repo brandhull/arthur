@@ -63,7 +63,10 @@ targets:
   ArthurBar:
     type: application
     platform: macOS
-    sources: [Bar/Sources/Bar]
+    sources:
+      - path: Bar/Sources/Bar
+      - path: App/Resources-Mac
+        buildPhase: resources
     dependencies:
       - package: ArthurKit
     info:
@@ -76,6 +79,11 @@ targets:
       CODE_SIGN_STYLE: Automatic
       DEVELOPMENT_TEAM: ""
       ENABLE_HARDENED_RUNTIME: true
+      # Same icon as the main app — ArthurBar shows up in Brandon's actual
+      # Applications list now (a real login item, not just an Xcode debug
+      # artifact), so it should look like it belongs there instead of
+      # using Xcode's generic default icon.
+      ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
 
 schemes:
   Arthur-iOS:
