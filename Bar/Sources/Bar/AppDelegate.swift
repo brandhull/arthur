@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.autosaveName = "ArthurBar"
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "checklist", accessibilityDescription: "Arthur Quick Task")
+            button.image = NSImage(systemSymbolName: "checkmark.rectangle.stack", accessibilityDescription: "Arthur Quick Task")
         }
         statusItem.menu = buildMenu()
 
