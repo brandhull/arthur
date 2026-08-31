@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.autosaveName = "ArthurBar"
         if let button = statusItem.button {
-            let image = NSImage(systemSymbolName: "checkmark.rectangle.stack", accessibilityDescription: "Arthur Quick Task")
+            let image = NSImage(systemSymbolName: "brain.fill", accessibilityDescription: "Arthur Quick Task")
             // Without isTemplate, this rendered as a plain black glyph
             // regardless of menu bar theme/highlight state — every other
             // icon in the menu bar is a template image (monochrome,
