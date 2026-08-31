@@ -15,7 +15,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.autosaveName = "ArthurBar"
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "checkmark.rectangle.stack", accessibilityDescription: "Arthur Quick Task")
+            let image = NSImage(systemSymbolName: "checkmark.rectangle.stack", accessibilityDescription: "Arthur Quick Task")
+            // Without isTemplate, this rendered as a plain black glyph
+            // regardless of menu bar theme/highlight state — every other
+            // icon in the menu bar is a template image (monochrome,
+            // automatically inverts on dark backgrounds and when an item
+            // is highlighted/clicked), which is what made ArthurBar's
+            // stand out next to them. A matching regular-weight symbol
+            // configuration keeps its stroke weight in line with the
+            // thinner neighboring icons too, rather than the default
+            // weight reading bolder/heavier by comparison.
+            image?.isTemplate = true
+            button.image = image?.withSymbolConfiguration(
+                NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+            )
         }
         statusItem.menu = buildMenu()
 
