@@ -21,13 +21,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // icon in the menu bar is a template image (monochrome,
             // automatically inverts on dark backgrounds and when an item
             // is highlighted/clicked), which is what made ArthurBar's
-            // stand out next to them. A matching regular-weight symbol
-            // configuration keeps its stroke weight in line with the
-            // thinner neighboring icons too, rather than the default
-            // weight reading bolder/heavier by comparison.
+            // stand out next to them. 14pt still read visibly smaller than
+            // its neighbors (Brandon flagged it after the isTemplate fix);
+            // 17pt is the standard NSStatusItem glyph size most menu bar
+            // apps actually use.
             image?.isTemplate = true
             button.image = image?.withSymbolConfiguration(
-                NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+                NSImage.SymbolConfiguration(pointSize: 17, weight: .regular)
             )
         }
         statusItem.menu = buildMenu()
