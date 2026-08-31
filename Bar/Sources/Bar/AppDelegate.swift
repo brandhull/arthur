@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // apps actually use.
             image?.isTemplate = true
             button.image = image?.withSymbolConfiguration(
-                NSImage.SymbolConfiguration(pointSize: 17, weight: .regular)
+                NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
             )
         }
         statusItem.menu = buildMenu()
