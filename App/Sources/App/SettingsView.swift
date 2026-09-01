@@ -12,6 +12,7 @@ import ArthurKit
 /// still matches everything else visually.
 struct SettingsView: View {
     @ObservedObject var store: TaskStore
+    @ObservedObject var documentStore: DocumentStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var systemScheme
 
@@ -356,6 +357,17 @@ struct SettingsView: View {
                     Button {
                         Task {
                             isSyncing = true
+                            // forceSync() only ever covered tasks/daily
+                            // note/Rocks — it has no idea DocumentStore
+                            // exists, so Quick Capture's document list
+                            // (and therefore its recents, which resolve
+                            // against that same list) never actually
+                            // refreshed here no matter how many times
+                            // Force Sync was pressed. Brandon: new
+                            // documents ("Week of 2026-08-31") weren't
+                            // showing up in search even right after a
+                            // Force Sync — this is why.
+                            documentStore.refresh(craftLink: store.config.craftLink)
                             await store.forceSync()
                             isSyncing = false
                         }
@@ -551,6 +563,7 @@ struct SettingsView: View {
         store.config.senecaAuthorField = senecaAuthorField.trimmingCharacters(in: .whitespaces).isEmpty ? "Author" : senecaAuthorField
         store.config.save()
         store.reloadConfig()
+        documentStore.refresh(craftLink: store.config.craftLink)
         Task { await store.forceSync() }
     }
 }

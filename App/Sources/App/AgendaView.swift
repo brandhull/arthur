@@ -135,7 +135,7 @@ struct AgendaView: View {
         .pinnedOnTop(store.config.pinOnTop)
         #endif
         .sheet(isPresented: $showingSettings) {
-            SettingsView(store: store)
+            SettingsView(store: store, documentStore: documentStore)
         }
         .sheet(isPresented: $showingAddTask) {
             AddTaskSheet(store: store)
@@ -166,7 +166,13 @@ struct AgendaView: View {
                 Task { await store.refreshIfStale() }
             }
         }
-        .refreshable { await store.forceSync() }
+        .refreshable {
+            // Same gap as Settings' Force Sync button — pull-to-refresh
+            // only ever covered TaskStore's own data, never the document
+            // list Quick Capture searches against.
+            documentStore.refresh(craftLink: store.config.craftLink)
+            await store.forceSync()
+        }
         .alert("Something went wrong", isPresented: .constant(store.errorMessage != nil), actions: {
             Button("OK") { store.errorMessage = nil }
         }, message: {
