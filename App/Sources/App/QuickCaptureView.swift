@@ -151,49 +151,16 @@ struct QuickCaptureView: View {
         FieldBox(scheme: effectiveScheme) {
             ZStack(alignment: .topLeading) {
                 if draft.text.isEmpty {
-                    // A quick-reference cheat sheet for the markdown syntax
-                    // Craft itself understands, not just a generic
-                    // placeholder — Brandon: this is specifically to help
-                    // him learn/use markdown better while typing a capture,
-                    // since whatever's typed here goes straight through to
-                    // Craft as real markdown (see appendBlocks/CraftClient),
-                    // unlike Baserow's plain-text long_text field. Scoped to
-                    // just this box, not every "Nothing here yet." placeholder
-                    // in the app — Rocks/Reflection's empty states aren't
-                    // input fields, and this list is explicitly kept short
-                    // (Brandon's own request) rather than exhaustive.
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Nothing here yet.")
-                        // Blank line between the placeholder and the
-                        // reference list — an empty Text, not extra
-                        // .padding, so it takes up exactly one line's
-                        // height at this same font size rather than an
-                        // arbitrary point value.
-                        Text(verbatim: "")
-                        // Text(verbatim:), not the default Text(_:) — that
-                        // initializer treats a string literal as
-                        // LocalizedStringKey and auto-parses its own inline
-                        // markdown, so "**Strong**" rendered as an actual
-                        // bold "Strong" and the link syntax rendered as a
-                        // real styled link — exactly backwards from showing
-                        // the raw syntax as an example. verbatim forces it
-                        // to display literally instead.
-                        // "##", not "#" — a Craft doc's own title already
-                        // renders as H1, so a capture landing inside it
-                        // should default to H2 as the example, not compete
-                        // with the page title's own size.
-                        Text(verbatim: "## Heading")
-                        Text(verbatim: "**Strong**")
-                        Text(verbatim: "- [ ] Todo")
-                        Text(verbatim: "- Bullet")
-                        // No space between ] and ( — a space there breaks
-                        // the link syntax.
-                        Text(verbatim: "[link text](URL)")
-                    }
-                    .font(.system(size: inputFontSize))
-                    .foregroundStyle(Theme.secondaryText(effectiveScheme))
-                    .padding(12)
-                    .allowsHitTesting(false)
+                    // Was a markdown-syntax cheat sheet (# Heading/**Strong**/
+                    // etc.) to help Brandon learn Craft's markdown while
+                    // typing — removed once he no longer needed the
+                    // reminder, back to the same plain placeholder every
+                    // other "Nothing here yet." empty state in the app uses.
+                    Text("Nothing here yet.")
+                        .font(.system(size: inputFontSize))
+                        .foregroundStyle(Theme.secondaryText(effectiveScheme))
+                        .padding(12)
+                        .allowsHitTesting(false)
                 }
                 PlainTextEditor(text: $draft.text, fontSize: inputFontSize, scheme: effectiveScheme)
                     .frame(minHeight: 120)
