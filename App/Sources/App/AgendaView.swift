@@ -1,16 +1,20 @@
 import SwiftUI
 import ArthurKit
 
-/// Which of the five home-screen tabs is showing. Order matches Brandon's
-/// explicit request: Rocks, Tasks, Quick Capture, Reflection, then Search
-/// Baserow last. No SF Symbols for now — a deliberate simplification, not
-/// an oversight.
+/// Which of the four home-screen tabs is showing. Order matches Brandon's
+/// explicit request: Rocks, Tasks, Quick Capture, then Reflection. No SF
+/// Symbols for now — a deliberate simplification, not an oversight.
+///
+/// Search Baserow was a fifth tab here, removed once Brandon found he
+/// wasn't using it at all — he's spinning Baserow browsing out into its own
+/// separate app instead. Quick Capture's own Craft/Baserow toggle (pushing
+/// a row into a table) is unrelated and stays; only the standalone
+/// search-and-browse tab is gone.
 enum HomeTab: String, CaseIterable, Identifiable {
     case rocks = "Rocks"
     case tasks = "Tasks"
     case quickCapture = "Quick Capture"
     case reflection = "Reflection"
-    case searchBaserow = "Search Baserow"
     var id: String { rawValue }
 }
 
@@ -116,9 +120,6 @@ struct AgendaView: View {
                     ReflectionView(store: store)
                         .opacity(selectedTab == .reflection ? 1 : 0)
                         .allowsHitTesting(selectedTab == .reflection)
-                    SearchBaserowView(store: store)
-                        .opacity(selectedTab == .searchBaserow ? 1 : 0)
-                        .allowsHitTesting(selectedTab == .searchBaserow)
                 }
             }
 

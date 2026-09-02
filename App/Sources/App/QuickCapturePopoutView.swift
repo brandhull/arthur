@@ -83,8 +83,8 @@ struct QuickCapturePopoutView: View {
                         .padding(12)
                         .allowsHitTesting(false)
                 }
-                // Same padding pattern as QuickCaptureView's Craft box and
-                // SearchBaserowView's search box — 12 on every edge except
+                // Same padding pattern as QuickCaptureView's Craft box —
+                // 12 on every edge except
                 // leading, which drops to 7 to compensate for TextEditor's
                 // own ~5pt internal inset that the placeholder Text doesn't
                 // have. This pop-out originally used mismatched values (16
