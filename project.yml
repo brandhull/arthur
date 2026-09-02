@@ -34,8 +34,17 @@ targets:
       PRODUCT_BUNDLE_IDENTIFIER: com.brandonhull.arthur
       TARGETED_DEVICE_FAMILY: "1,2"
       CODE_SIGN_STYLE: Automatic
-      DEVELOPMENT_TEAM: ""
+      DEVELOPMENT_TEAM: D53LTKT473
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    entitlements:
+      path: App/Arthur-iOS.entitlements
+      properties:
+        # Explicit shared identifier, not the $(CFBundleIdentifier)-derived
+        # default — Arthur-iOS/Arthur-Mac/ArthurBar are three different
+        # bundle IDs, so the default per-target KVS identifier would give
+        # each one its own isolated iCloud store instead of one shared
+        # settings sync. All three targets use this exact same string.
+        com.apple.developer.ubiquity-kvstore-identifier: D53LTKT473.com.brandonhull.arthur.shared
 
   Arthur-Mac:
     type: application
@@ -56,9 +65,15 @@ targets:
       PRODUCT_NAME: Arthur
       PRODUCT_BUNDLE_IDENTIFIER: com.brandonhull.arthur.mac
       CODE_SIGN_STYLE: Automatic
-      DEVELOPMENT_TEAM: ""
+      DEVELOPMENT_TEAM: D53LTKT473
       ENABLE_HARDENED_RUNTIME: true
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    entitlements:
+      path: App/Arthur-Mac.entitlements
+      properties:
+        # Same shared identifier as every other target — see Arthur-iOS's
+        # entitlements comment for why this can't just be the default.
+        com.apple.developer.ubiquity-kvstore-identifier: D53LTKT473.com.brandonhull.arthur.shared
 
   ArthurBar:
     type: application
@@ -77,8 +92,14 @@ targets:
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.brandonhull.arthurbar
       CODE_SIGN_STYLE: Automatic
-      DEVELOPMENT_TEAM: ""
+      DEVELOPMENT_TEAM: D53LTKT473
       ENABLE_HARDENED_RUNTIME: true
+    entitlements:
+      path: Bar/ArthurBar.entitlements
+      properties:
+        # Same shared identifier as every other target — see Arthur-iOS's
+        # entitlements comment for why this can't just be the default.
+        com.apple.developer.ubiquity-kvstore-identifier: D53LTKT473.com.brandonhull.arthur.shared
       # Same icon as the main app — ArthurBar shows up in Brandon's actual
       # Applications list now (a real login item, not just an Xcode debug
       # artifact), so it should look like it belongs there instead of

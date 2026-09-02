@@ -28,6 +28,31 @@ final class TaskStore: ObservableObject {
 
     private var client: CraftClient { CraftClient(url: config.craftLink) }
 
+    private var cloudConfigObserver: NSObjectProtocol?
+
+    init() {
+        // Kicks off an initial fetch of whatever's already in iCloud —
+        // best-effort/async per Apple's docs, not guaranteed to complete
+        // before this returns, which is exactly why the observer below
+        // matters: if the true cloud value arrives a moment after this
+        // cold launch's own Config.load() already ran, the
+        // didChangeExternally notification is what actually picks it up
+        // rather than it silently sitting unread until next launch.
+        Config.synchronizeCloud()
+        cloudConfigObserver = NotificationCenter.default.addObserver(
+            forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.reloadConfig()
+        }
+    }
+
+    deinit {
+        if let cloudConfigObserver {
+            NotificationCenter.default.removeObserver(cloudConfigObserver)
+        }
+    }
+
     /// Guards the scenePhase-triggered refetch in AgendaView — same
     /// staleness-gate idea as DocumentStore.refreshIfStale. Without this,
     /// every `.active` transition re-ran refresh()+loadDailyNote()+

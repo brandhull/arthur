@@ -29,11 +29,12 @@ public enum AppearanceMode: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-/// App configuration. Local UserDefaults for now (v1) — iCloud key-value sync
-/// is planned once Brandon's Apple Developer Program membership is renewed
-/// (see SCOPE.md "Distribution"), so this is intentionally isolated behind a
-/// single load/save pair to swap the storage backend later without touching
-/// call sites.
+/// App configuration. Synced across devices via iCloud Key-Value Storage
+/// (NSUbiquitousKeyValueStore) as of Brandon's paid Apple Developer Program
+/// membership — see the cloud sync section below load()/save(). Storage
+/// backend is isolated behind this single load/save pair specifically so
+/// that transition didn't need to touch any call site in the App or Bar
+/// targets.
 public struct Config: Codable {
     public var craftLink: String
     public var inboxes: [InboxDestination]
@@ -56,6 +57,14 @@ public struct Config: Codable {
     /// Brandon's explicit ask for this to be an opt-in toggle, not a new
     /// always-on default.
     public var pinOnTop: Bool
+    /// Bumped on every save() — the only way to tell which of "the local
+    /// file" and "iCloud's copy" is actually newer when they disagree,
+    /// since Codable structs have no other ordering signal. Defaults to
+    /// .distantPast (not .now) for configs decoded before this field
+    /// existed, so an old local file always loses to a real cloud value
+    /// instead of a stale local read winning just because it happened to
+    /// decode a split-second before the cloud fetch resolved.
+    public var lastModified: Date
 
     public init(craftLink: String = "", inboxes: [InboxDestination] = [],
                 defaultInboxId: String? = nil, appearance: AppearanceMode = .platformDefault,
@@ -64,7 +73,8 @@ public struct Config: Codable {
                 lastBaserowDatabaseId: Int? = nil, lastBaserowTableId: Int? = nil,
                 senecaDatabaseId: Int? = nil, senecaTableId: Int? = nil,
                 senecaQuoteField: String = "Quote", senecaAuthorField: String = "Author",
-                rocksDocumentId: String? = nil, pinOnTop: Bool = false) {
+                rocksDocumentId: String? = nil, pinOnTop: Bool = false,
+                lastModified: Date = .distantPast) {
         self.craftLink = craftLink
         self.inboxes = inboxes
         self.defaultInboxId = defaultInboxId
@@ -79,6 +89,7 @@ public struct Config: Codable {
         self.senecaAuthorField = senecaAuthorField
         self.rocksDocumentId = rocksDocumentId
         self.pinOnTop = pinOnTop
+        self.lastModified = lastModified
     }
 
     /// Custom Decodable so an existing config.json saved before the Baserow
@@ -101,6 +112,7 @@ public struct Config: Codable {
         senecaAuthorField = try c.decodeIfPresent(String.self, forKey: .senecaAuthorField) ?? "Author"
         rocksDocumentId = try c.decodeIfPresent(String.self, forKey: .rocksDocumentId)
         pinOnTop = try c.decodeIfPresent(Bool.self, forKey: .pinOnTop) ?? false
+        lastModified = try c.decodeIfPresent(Date.self, forKey: .lastModified) ?? .distantPast
     }
 
     /// nil means Craft's standard inbox — deliberately not a fallback to
@@ -129,18 +141,98 @@ public struct Config: Codable {
 
     static var configFile: URL { supportDir.appendingPathComponent("config.json") }
 
-    public static func load() -> Config {
+    // MARK: - iCloud sync
+    //
+    // NSUbiquitousKeyValueStore, not CloudKit or iCloud Documents — Config
+    // is a small settings blob (well under NSUbiquitousKeyValueStore's 1MB
+    // per-key/whole-store limits), which is exactly what key-value storage
+    // is for; CloudKit/Documents are built for much larger or
+    // relationally-structured data Arthur doesn't have here. All three
+    // targets (Arthur-iOS, Arthur-Mac, ArthurBar) share one explicit
+    // ubiquity-kvstore-identifier entitlement (see project.yml) rather than
+    // each getting its own default per-bundle-ID store — without that,
+    // "sync across my three devices" would silently only sync within a
+    // single bundle ID, missing Mac entirely.
+    //
+    // Safe to call even before Brandon confirms the paid team/capability in
+    // Xcode: NSUbiquitousKeyValueStore.default is always a valid object,
+    // and reads/writes without the entitlement just silently no-op rather
+    // than crashing — so this behaves as local-only until that's set up,
+    // then starts syncing the moment it is, with no code change needed.
+    private static let kvStore = NSUbiquitousKeyValueStore.default
+    private static let kvKey = "config"
+
+    /// Best-effort request to pull the latest values down from iCloud —
+    /// call once at launch, before relying on load(). Apple's docs are
+    /// explicit that this doesn't guarantee completion before returning;
+    /// the actual arrival (if it's later than what load() already saw) is
+    /// what NSUbiquitousKeyValueStore.didChangeExternallyNotification is
+    /// for (see TaskStore's observer).
+    public static func synchronizeCloud() {
+        kvStore.synchronize()
+    }
+
+    private static func loadLocal() -> Config? {
         guard let data = try? Data(contentsOf: configFile),
-              let cfg = try? JSONDecoder().decode(Config.self, from: data) else {
-            return Config()
-        }
+              let cfg = try? JSONDecoder().decode(Config.self, from: data) else { return nil }
         return cfg
     }
 
-    public func save() {
+    private static func loadFromCloud() -> Config? {
+        guard let data = kvStore.data(forKey: kvKey),
+              let cfg = try? JSONDecoder().decode(Config.self, from: data) else { return nil }
+        return cfg
+    }
+
+    /// Merges whichever of local-file/iCloud is actually newer (by
+    /// lastModified) rather than always preferring one — a device that's
+    /// been offline and just reconnected shouldn't clobber a same-day edit
+    /// made elsewhere, and a device that made the most recent real change
+    /// shouldn't lose it to a stale cloud read on next launch. Adopting the
+    /// winning side's value also mirrors it into the *other* store
+    /// (local file or cloud, whichever lost) so both stay consistent
+    /// going forward rather than only agreeing again after the next save().
+    public static func load() -> Config {
+        let local = loadLocal()
+        let cloud = loadFromCloud()
+        switch (local, cloud) {
+        case (nil, nil):
+            return Config()
+        case (let l?, nil):
+            return l
+        case (nil, let c?):
+            c.saveLocalOnly()
+            return c
+        case (let l?, let c?):
+            if c.lastModified > l.lastModified {
+                c.saveLocalOnly()
+                return c
+            } else if l.lastModified > c.lastModified {
+                l.saveCloudOnly()
+                return l
+            }
+            return l
+        }
+    }
+
+    private func saveLocalOnly() {
         if let data = try? JSONEncoder().encode(self) {
             try? data.write(to: Self.configFile)
         }
+    }
+
+    private func saveCloudOnly() {
+        if let data = try? JSONEncoder().encode(self) {
+            Self.kvStore.set(data, forKey: Self.kvKey)
+            Self.kvStore.synchronize()
+        }
+    }
+
+    public func save() {
+        var toSave = self
+        toSave.lastModified = Date()
+        toSave.saveLocalOnly()
+        toSave.saveCloudOnly()
     }
 
     public var isConfigured: Bool { !craftLink.isEmpty && URL(string: craftLink) != nil }
