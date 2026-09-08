@@ -148,6 +148,22 @@ struct AgendaView: View {
             await store.refreshIfStale()
             documentStore.refreshIfStale(craftLink: store.config.craftLink)
         }
+        // Brandon leaves Arthur open all day in one focused window, so
+        // neither the cold-launch `.task` above nor the scenePhase-driven
+        // refresh below (which only fires on an actual refocus) reliably
+        // catches a document he created in Craft a few hours into that
+        // session — nothing was polling in the background. This loop runs
+        // for as long as AgendaView itself is alive (the app's whole
+        // lifetime), independent of window focus. Uses `documentStore
+        // .refresh` directly, not `refreshIfStale` — the 30-minute sleep
+        // already is the staleness gate, no need to layer another one.
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 30 * 60 * 1_000_000_000)
+                guard !Task.isCancelled else { return }
+                documentStore.refresh(craftLink: store.config.craftLink)
+            }
+        }
         // `.task` only fires once per view lifecycle (cold launch), not when
         // resuming from the background — without this, "open the app" after
         // switching away and back would silently show stale data until a
@@ -165,6 +181,7 @@ struct AgendaView: View {
         .onChange(of: scenePhase) {
             if scenePhase == .active {
                 Task { await store.refreshIfStale() }
+                documentStore.refreshIfStale(craftLink: store.config.craftLink)
             }
         }
         .refreshable {
