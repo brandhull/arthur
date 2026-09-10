@@ -42,14 +42,24 @@ struct PlainTextEditor: View {
     @Binding var text: String
     let fontSize: CGFloat
     let scheme: ColorScheme
+    /// Mac-only, opt-in: when this flips from false to true, the field
+    /// grabs first responder automatically — used by Quick Capture's Craft
+    /// box so switching into it from the sidebar drops the cursor there
+    /// immediately, no click needed. Ignored on iOS (not asked for there).
+    /// Not a @Binding — this is a one-way trigger, not state PlainTextEditor
+    /// itself needs to report back.
+    var autoFocusWhen: Bool = false
 
     var body: some View {
         #if os(iOS)
         UITextViewBridge(text: $text, font: .systemFont(ofSize: fontSize), textColor: UIColor(Theme.primary(scheme)))
             .padding(12)
         #else
-        NSTextViewBridge(text: $text, font: .systemFont(ofSize: fontSize), textColor: NSColor(Theme.primary(scheme)))
-            .padding(12)
+        NSTextViewBridge(
+            text: $text, font: .systemFont(ofSize: fontSize), textColor: NSColor(Theme.primary(scheme)),
+            autoFocusWhen: autoFocusWhen
+        )
+        .padding(12)
         #endif
     }
 }
@@ -109,6 +119,7 @@ private struct NSTextViewBridge: NSViewRepresentable {
     @Binding var text: String
     let font: NSFont
     let textColor: NSColor
+    var autoFocusWhen: Bool = false
 
     func makeNSView(context: Context) -> NSScrollView {
         let textView = NSTextView()
@@ -146,12 +157,24 @@ private struct NSTextViewBridge: NSViewRepresentable {
         if textView.string != text { textView.string = text }
         if textView.font != font { textView.font = font }
         if textView.textColor != textColor { textView.textColor = textColor }
+        // Edge-triggered, not "focus whenever true" — this view is never
+        // destroyed/recreated across an outer tab switch (the opacity-swap
+        // pattern), so without tracking the previous value, an already-true
+        // autoFocusWhen would try to steal focus back on every unrelated
+        // SwiftUI update, fighting the user if they'd clicked elsewhere.
+        if autoFocusWhen, !context.coordinator.wasAutoFocusRequested {
+            DispatchQueue.main.async {
+                textView.window?.makeFirstResponder(textView)
+            }
+        }
+        context.coordinator.wasAutoFocusRequested = autoFocusWhen
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var text: Binding<String>
+        var wasAutoFocusRequested = false
         init(text: Binding<String>) { self.text = text }
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }

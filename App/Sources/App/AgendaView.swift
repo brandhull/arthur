@@ -196,7 +196,10 @@ struct AgendaView: View {
             TasksView(store: store)
                 .opacity(selectedTab == .tasks ? 1 : 0)
                 .allowsHitTesting(selectedTab == .tasks)
-            QuickCaptureView(store: store, documentStore: documentStore, source: $quickCaptureSource)
+            QuickCaptureView(
+                store: store, documentStore: documentStore, source: $quickCaptureSource,
+                isActive: selectedTab == .quickCapture
+            )
                 .opacity(selectedTab == .quickCapture ? 1 : 0)
                 .allowsHitTesting(selectedTab == .quickCapture)
             ReflectionView(store: store)

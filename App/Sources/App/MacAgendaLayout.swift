@@ -3,13 +3,14 @@ import SwiftUI
 import ArthurKit
 
 /// Mac-only root layout — Notion/Maverick-style collapsible, resizable
-/// sidebar (HSplitView, not NavigationSplitView: the sidebar needs custom
-/// chrome — a quick-add button, a gear pinned to the bottom, nested Quick
-/// Capture rows — that NavigationSplitView's system-owned collapse/toolbar
-/// model doesn't cleanly accommodate) plus one main content pane. Replaces
-/// AgendaView's old dropdown+floating-"+"-button chrome on Mac only; iOS/
-/// iPadOS keep that layout entirely, unchanged, via AgendaView's own
-/// `#if os(macOS)` branch.
+/// sidebar (ResizableHSplit, a custom NSSplitViewController wrapper — not
+/// SwiftUI's own HSplitView, whose divider can't be hidden/restyled, and
+/// not NavigationSplitView, whose sidebar column needs custom chrome — a
+/// quick-add button, a gear pinned to the bottom, nested Quick Capture rows
+/// — that its system-owned collapse/toolbar model doesn't cleanly
+/// accommodate) plus one main content pane. Replaces AgendaView's old
+/// dropdown+floating-"+"-button chrome on Mac only; iOS/iPadOS keep that
+/// layout entirely, unchanged, via AgendaView's own `#if os(macOS)` branch.
 struct MacAgendaLayout<Content: View>: View {
     @ObservedObject var store: TaskStore
     @Binding var selectedTab: HomeTab
@@ -48,25 +49,51 @@ struct MacAgendaLayout<Content: View>: View {
     }
 
     var body: some View {
-        HSplitView {
-            if !sidebarCollapsed {
+        ResizableHSplit(
+            isCollapsed: $sidebarCollapsed,
+            leadingMinWidth: Theme.sidebarMinWidth, leadingIdealWidth: Theme.sidebarIdealWidth,
+            leadingMaxWidth: Theme.sidebarMaxWidth
+        ) {
+            // The ZStack's own background fills the whole pane the split
+            // controller hands this child — an NSSplitViewItem's pane
+            // otherwise paints its own default fill underneath our SwiftUI
+            // content, which would show through the inset gap instead of
+            // Arthur's own background. Painting it explicitly here, then
+            // floating the rounded, distinctly-colored, thin-bordered
+            // sidebar card on top with a margin on three sides (not the
+            // trailing edge, which abuts the — now invisible — divider), is
+            // what gives the "inset, floating over the window" look from
+            // Brandon's Maverick reference, right down to Maverick's own
+            // thin hairline border replacing what would otherwise be a
+            // harsh black divider line.
+            ZStack(alignment: .topLeading) {
+                Theme.background(effectiveScheme)
                 SidebarView(
                     store: store, selectedTab: $selectedTab, quickCaptureSource: $quickCaptureSource,
                     isCollapsed: $sidebarCollapsed, showingSettings: $showingSettings,
                     showingAddTask: $showingAddTask, showingQuickAdd: $showingQuickAdd,
                     effectiveScheme: effectiveScheme
                 )
-                .frame(
-                    minWidth: Theme.sidebarMinWidth, idealWidth: Theme.sidebarIdealWidth,
-                    maxWidth: Theme.sidebarMaxWidth, maxHeight: .infinity
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
+                        .fill(Theme.sidebarCardBackground(effectiveScheme))
                 )
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
+                        .stroke(Theme.primary(effectiveScheme).opacity(Theme.borderOpacity), lineWidth: Theme.borderWidth)
+                )
+                .padding(.top, Theme.sidebarCardInset)
+                .padding(.bottom, Theme.sidebarCardInset)
+                .padding(.leading, Theme.sidebarCardInset)
+                .padding(.trailing, Theme.sidebarCardInset / 2)
             }
-
+        } trailing: {
             VStack(spacing: 0) {
                 topBar
                 content
             }
             .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
+            .background(Theme.background(effectiveScheme))
         }
     }
 

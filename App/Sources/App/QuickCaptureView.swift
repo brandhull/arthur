@@ -18,9 +18,6 @@ struct QuickCaptureView: View {
     @ObservedObject var store: TaskStore
     @ObservedObject var documentStore: DocumentStore
     @EnvironmentObject var draft: QuickCaptureDraft
-    #if os(macOS)
-    @Environment(\.openWindow) private var openWindow
-    #endif
     @Environment(\.colorScheme) private var systemScheme
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -32,11 +29,17 @@ struct QuickCaptureView: View {
     // PillFilterBar toggle below, so nothing looks different there.
     @Binding var source: QuickCaptureSource
 
+    // True whenever the Quick Capture tab itself is the selected one (set
+    // by AgendaView's shared tabContent, which already knows this from the
+    // opacity-swap condition) — Mac-only use: it's the edge-trigger signal
+    // for auto-focusing the Craft capture box's cursor on arrival. Harmless
+    // on iOS, just unused there.
+    let isActive: Bool
+
     // MARK: Craft state
     // craftText/addSeparator used to be local @State here — now they live
-    // on the shared `draft` (QuickCaptureDraft) instead, so the Mac-only
-    // pop-out window (QuickCapturePopoutView) shows/edits the exact same
-    // in-progress text rather than a copy that has to be synced.
+    // on the shared `draft` (QuickCaptureDraft) instead (see that type's own
+    // comment for why this is still an environment object).
     @State private var query = ""
     @State private var selectedDoc: CraftDocument?
     @State private var isCraftSubmitting = false
@@ -145,39 +148,39 @@ struct QuickCaptureView: View {
 
     #if os(macOS)
     /// Craft/Baserow is picked in the sidebar now (nested rows under Quick
-    /// Capture), not an in-view pill — this row exists only to hold the
-    /// pop-out button, Craft-only, same header-row height every other tab
-    /// uses. Below that: the capture box fills the main pane, and the
-    /// destination picker/Add Separator/Save sit in a bottom-docked panel —
-    /// per Brandon's request to move the destination controls out of the
-    /// main typing area. Baserow has no equivalent free-text main-pane
-    /// content, so its whole form (Database → Table → fields → Push) just
-    /// fills the main pane directly, per Brandon's explicit call.
+    /// Capture), not an in-view pill. The capture box fills the main pane,
+    /// unbordered (Brandon: content should flow with just padding, not sit
+    /// in a box — same principle as Rocks/Tasks/Reflection's ContentBox on
+    /// Mac), and the destination picker/Add Separator/Save sit in a
+    /// bottom-docked floating card — same inset/rounded/thin-bordered
+    /// treatment as the sidebar (Theme.sidebarCardBackground), rather than
+    /// a flat divider+tint panel. Baserow has no equivalent free-text
+    /// main-pane content, so its whole form (Database → Table → fields →
+    /// Push) just fills the main pane directly, per Brandon's explicit call.
     private var macBody: some View {
         VStack(spacing: 0) {
             if source == .craft {
-                HStack {
-                    Spacer()
-                    popoutButton
-                }
-                .padding(.horizontal, 20)
-                .frame(height: Theme.headerRowHeight)
-                .foregroundStyle(Theme.primary(effectiveScheme))
-
                 ScrollView {
                     craftCaptureBox
                         .padding(.bottom, 16)
                 }
                 .frame(maxHeight: .infinity)
 
-                Divider()
-
                 ScrollView {
                     craftDestinationSection
                         .padding(.vertical, 16)
                 }
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
+                        .fill(Theme.sidebarCardBackground(effectiveScheme))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
+                        .stroke(Theme.primary(effectiveScheme).opacity(Theme.borderOpacity), lineWidth: Theme.borderWidth)
+                )
+                .padding(.horizontal, Theme.sidebarCardInset)
+                .padding(.bottom, Theme.sidebarCardInset)
                 .frame(maxHeight: 280)
-                .background(Theme.primary(effectiveScheme).opacity(0.03))
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
@@ -191,27 +194,25 @@ struct QuickCaptureView: View {
         .foregroundStyle(Theme.primary(effectiveScheme))
         .onAppear(perform: handleOnAppear)
     }
-
-    private var popoutButton: some View {
-        Button {
-            openWindow(id: "quickCapturePopout")
-        } label: {
-            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                .font(.system(size: 14))
-                .foregroundStyle(Theme.secondaryText(effectiveScheme))
-                .frame(width: 28, height: 28)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help("Open in a separate window")
-    }
     #endif
 
     // MARK: - Craft section (formerly CaptureSheet)
 
+    // Mac: no border — content flows with just padding, same principle as
+    // Rocks/Tasks/Reflection's ContentBox on Mac (see those views' identical
+    // `contentBordered` comment). iOS/iPadOS keep FieldBox's border,
+    // unchanged.
+    private var captureBoxBordered: Bool {
+        #if os(macOS)
+        return false
+        #else
+        return true
+        #endif
+    }
+
     @ViewBuilder
     private var craftCaptureBox: some View {
-        FieldBox(scheme: effectiveScheme) {
+        FieldBox(scheme: effectiveScheme, bordered: captureBoxBordered) {
             ZStack(alignment: .topLeading) {
                 if draft.text.isEmpty {
                     // Was a markdown-syntax cheat sheet (# Heading/**Strong**/
@@ -225,8 +226,19 @@ struct QuickCaptureView: View {
                         .padding(12)
                         .allowsHitTesting(false)
                 }
+                #if os(macOS)
+                // autoFocusWhen: isActive — dropping the cursor here the
+                // instant Quick Capture becomes the selected sidebar item,
+                // no click needed, since the sidebar's collapsible now (no
+                // more separate pop-out window to expand into instead).
+                PlainTextEditor(
+                    text: $draft.text, fontSize: inputFontSize, scheme: effectiveScheme, autoFocusWhen: isActive
+                )
+                .frame(minHeight: 120)
+                #else
                 PlainTextEditor(text: $draft.text, fontSize: inputFontSize, scheme: effectiveScheme)
                     .frame(minHeight: 120)
+                #endif
             }
         }
         .padding(.top, 16)

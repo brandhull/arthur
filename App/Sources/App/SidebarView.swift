@@ -119,7 +119,11 @@ struct SidebarView: View {
             .padding(.bottom, 12)
         }
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(Theme.background(effectiveScheme))
+        // No own background here — MacAgendaLayout paints this view onto a
+        // rounded, distinctly-colored floating card from the outside
+        // (Theme.sidebarCardBackground), inset with a margin on 3 sides.
+        // Painting an opaque flat background here would sit on top of that
+        // and erase the rounded corners.
         .foregroundStyle(Theme.primary(effectiveScheme))
     }
 

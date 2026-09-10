@@ -8,6 +8,12 @@ struct FieldBox<Content: View>: View {
     // Explicit, not @Environment(\.colorScheme) — see ContentBox's identical
     // comment.
     let scheme: ColorScheme
+    // Mac's sidebar redesign wants Quick Capture's capture box to flow
+    // without a border (see ContentBox's identical `bordered` param and
+    // QuickCaptureView's `captureBoxBordered`) — every other FieldBox call
+    // site (actual form fields: Add Task, Baserow, the destination picker)
+    // keeps the default border.
+    var bordered: Bool = true
     @ViewBuilder let content: () -> Content
 
     var body: some View {
@@ -22,8 +28,10 @@ struct FieldBox<Content: View>: View {
             // border alone is enough to bound the field, matching every
             // ContentBox in the app instead of standing out from them.
             .overlay(
+                bordered ?
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .stroke(Theme.primary(scheme).opacity(Theme.borderOpacity), lineWidth: Theme.borderWidth)
+                : nil
             )
             .padding(.horizontal, 20)
     }

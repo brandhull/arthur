@@ -202,4 +202,22 @@ enum Theme {
     static let sidebarMinWidth: CGFloat = 180
     static let sidebarIdealWidth: CGFloat = 220
     static let sidebarMaxWidth: CGFloat = 320
+
+    /// The sidebar's own fill — distinct from the window's background so it
+    /// reads as a floating inset card (Brandon's "Maverick" reference)
+    /// rather than a flush panel with just a thin divider line. Reuses
+    /// existing tokens rather than inventing new ones: darkNeutral is
+    /// already a touch lighter than the dark-mode background; plain white
+    /// gives the same lift against light mode's off-white background.
+    static func sidebarCardBackground(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? darkNeutral : .white
+    }
+
+    /// Inset margin between the sidebar card and the window's edges/divider
+    /// on the other three sides (top/bottom/leading) — the amount of
+    /// surrounding background that has to show through for the "floating"
+    /// effect to actually read as floating rather than just a rounded panel
+    /// flush against the window.
+    static let sidebarCardInset: CGFloat = 8
+    static let sidebarCardCornerRadius: CGFloat = 10
 }
