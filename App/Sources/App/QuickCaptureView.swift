@@ -36,6 +36,16 @@ struct QuickCaptureView: View {
     // on iOS, just unused there.
     let isActive: Bool
 
+    #if os(macOS)
+    // Mac-only — collapsing the bottom-docked Destination card back to just
+    // its header, per Brandon's request for "a clean interface to type"
+    // similar to the old pop-out window's dedicated capture surface. Not
+    // persisted — each Quick Capture visit starts expanded, since the
+    // common case is picking a destination and saving, not leaving it
+    // collapsed indefinitely.
+    @State private var isDestinationExpanded = true
+    #endif
+
     // MARK: Craft state
     // craftText/addSeparator used to be local @State here — now they live
     // on the shared `draft` (QuickCaptureDraft) instead (see that type's own
@@ -166,9 +176,15 @@ struct QuickCaptureView: View {
                 }
                 .frame(maxHeight: .infinity)
 
-                ScrollView {
-                    craftDestinationSection
-                        .padding(.vertical, 16)
+                VStack(alignment: .leading, spacing: 0) {
+                    destinationHeader
+                    if isDestinationExpanded {
+                        ScrollView {
+                            destinationFields
+                                .padding(.top, 8)
+                                .padding(.bottom, 16)
+                        }
+                    }
                 }
                 .background(
                     RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
@@ -180,7 +196,7 @@ struct QuickCaptureView: View {
                 )
                 .padding(.horizontal, Theme.sidebarCardInset)
                 .padding(.bottom, Theme.sidebarCardInset)
-                .frame(maxHeight: 280)
+                .frame(maxHeight: isDestinationExpanded ? 280 : nil)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
@@ -193,6 +209,34 @@ struct QuickCaptureView: View {
         }
         .foregroundStyle(Theme.primary(effectiveScheme))
         .onAppear(perform: handleOnAppear)
+    }
+
+    /// "Destination" title + a collapse/expand chevron, top-right of the
+    /// card — Brandon's ask, matching the disclosure affordance he had with
+    /// the old pop-out window's separate capture surface. Collapsing hides
+    /// everything below (destination picker, Add Separator, Save), leaving
+    /// just this header row so the capture box above gets that space back.
+    private var destinationHeader: some View {
+        HStack {
+            Text("Destination")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color.primary)
+            Spacer()
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) { isDestinationExpanded.toggle() }
+            } label: {
+                Image(systemName: isDestinationExpanded ? "chevron.down" : "chevron.up")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.secondaryText(effectiveScheme))
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(isDestinationExpanded ? "Collapse" : "Expand")
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 14)
+        .padding(.bottom, isDestinationExpanded ? 0 : 14)
     }
     #endif
 
@@ -244,12 +288,19 @@ struct QuickCaptureView: View {
         .padding(.top, 16)
     }
 
+    // iOS keeps the label baked into the section, exactly as before. Mac's
+    // macBody renders its own header (title + collapse chevron) instead and
+    // calls `destinationFields` directly — see that computed property.
     @ViewBuilder
     private var craftDestinationSection: some View {
         // Bumped from 4 — Brandon: it read as too close to the Capture box
         // above it.
         FieldLabel(title: "Destination", topPadding: 10)
+        destinationFields
+    }
 
+    @ViewBuilder
+    private var destinationFields: some View {
         FieldBox(scheme: effectiveScheme) {
             VStack(alignment: .leading, spacing: 0) {
                 if let selectedDoc {
