@@ -92,9 +92,10 @@ struct QuickAddModal: View {
                 .padding(.horizontal, 14)
             DailyNoteComposeBox(
                 store: store, text: $reflectionText,
-                effectiveScheme: effectiveScheme, inputFontSize: Theme.inputFontSize()
+                effectiveScheme: effectiveScheme, inputFontSize: Theme.inputFontSize(), bordered: false
             )
             .frame(height: 140)
+            .padding(.horizontal, 14)
             HStack {
                 Spacer()
                 PillButton(systemImage: "arrow.up.circle", label: "Add") {

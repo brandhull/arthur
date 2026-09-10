@@ -41,7 +41,14 @@ struct SidebarView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .popover(isPresented: $showingQuickAdd, arrowEdge: .bottom) {
+                // .trailing, not .bottom — .bottom centers the popover
+                // under the anchor, and this button sits close enough to
+                // the sidebar's left edge that the wider "New Reflection"
+                // compose state (340pt) got pushed left of the window
+                // entirely, clipping its own title. Anchoring to the
+                // trailing edge only ever grows rightward, so it can't
+                // overflow off the left regardless of width.
+                .popover(isPresented: $showingQuickAdd, arrowEdge: .trailing) {
                     QuickAddModal(
                         store: store, selectedTab: $selectedTab,
                         showingAddTask: $showingAddTask, isPresented: $showingQuickAdd
@@ -70,7 +77,7 @@ struct SidebarView: View {
                 // header) — only the missing dot and disabled tap tell it
                 // apart from an active/inactive leaf row.
                 Text(HomeTab.quickCapture.rawValue)
-                    .font(.system(size: 13, weight: .regular))
+                    .font(.system(size: 14, weight: .regular))
                     .foregroundStyle(Theme.primary(effectiveScheme))
                     .padding(.horizontal, 14)
                     .padding(.top, 10)
@@ -107,7 +114,7 @@ struct SidebarView: View {
                     Image(systemName: "gearshape")
                         .font(.system(size: 14))
                     Text("Settings")
-                        .font(.system(size: 13, weight: .regular))
+                        .font(.system(size: 14, weight: .regular))
                     Spacer()
                 }
                 .foregroundStyle(Theme.primary(effectiveScheme))
@@ -130,13 +137,17 @@ struct SidebarView: View {
     private func navRow(title: String, isActive: Bool, indent: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 8) {
+                // 14pt system, default (primary) color, regular weight for
+                // every row — selection is conveyed by the dot alone, not a
+                // font-weight change, per Brandon's exact spec.
                 Text(title)
-                    .font(.system(size: 13, weight: isActive ? .semibold : .regular))
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(Theme.primary(effectiveScheme))
                 Spacer()
                 if isActive {
                     Circle()
                         .fill(Theme.accentBright)
-                        .frame(width: 6, height: 6)
+                        .frame(width: 8, height: 8)
                 }
             }
             .padding(.leading, indent ? 26 : 14)

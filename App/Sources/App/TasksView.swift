@@ -80,6 +80,12 @@ struct TasksView: View {
                         TaskRowView(task: task, store: store)
                             .listRowInsets(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
                             .listRowBackground(Color.clear)
+                            // Matches the same thin hairline every other
+                            // border in the app now uses (sidebar/
+                            // destination cards, FieldBox/ContentBox) —
+                            // the system default separator read solidly
+                            // gray/heavy next to those.
+                            .listRowSeparatorTint(Theme.primary(effectiveScheme).opacity(Theme.borderOpacity))
                     }
                     .listStyle(.plain)
                     .cornerRadius(8)

@@ -147,6 +147,13 @@ private struct NSTextViewBridge: NSViewRepresentable {
         let scrollView = NSScrollView()
         scrollView.documentView = textView
         scrollView.hasVerticalScroller = true
+        // Without this, the scroller track/thumb stayed visibly drawn in
+        // the corner even when there was nothing to scroll (an empty or
+        // short capture box) — autohidesScrollers is what tells AppKit to
+        // only actually show it while scrolling/content overflows, rather
+        // than keeping it permanently present just because
+        // hasVerticalScroller made one exist.
+        scrollView.autohidesScrollers = true
         scrollView.drawsBackground = false
         scrollView.borderType = .noBorder
         return scrollView

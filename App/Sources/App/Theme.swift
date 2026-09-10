@@ -154,14 +154,17 @@ enum Theme {
 
     /// Shared hairline weight for every border/outline/divider in the app —
     /// ContentBox, FieldBox, the Settings inline field replicas, the tab
-    /// dropdown's outline, and the tab bar's underline. These had drifted
-    /// into two different opacities (0.35 vs 0.15) despite comments in a
-    /// couple of the 0.15 spots explicitly (and incorrectly) claiming they
-    /// matched ContentBox — converged on 0.35, the majority/canonical value
-    /// already used everywhere else. Width dropped 25% (1 -> 0.75) per
-    /// Brandon's "very lean look" preference.
-    static let borderOpacity: Double = 0.35
-    static let borderWidth: CGFloat = 0.75
+    /// dropdown's outline, the tab bar's underline, and (as of the Mac
+    /// sidebar redesign) the sidebar/destination floating cards and the
+    /// Tasks list's row separators. These had drifted into two different
+    /// opacities (0.35 vs 0.15) despite comments in a couple of the 0.15
+    /// spots explicitly (and incorrectly) claiming they matched ContentBox
+    /// — converged on 0.35/0.75, then thinned again (0.35→0.2 opacity,
+    /// 0.75→0.5 width) once the sidebar card's border read as too heavy
+    /// next to Brandon's "Maverick" reference, whose own border is
+    /// noticeably thinner/lighter than Arthur's was at the previous values.
+    static let borderOpacity: Double = 0.2
+    static let borderWidth: CGFloat = 0.5
 
     /// Shared control height for the tab dropdown, the folder tabs (iPad),
     /// and the pill buttons (Today/Tomorrow, Craft/Baserow, Edit/Save/
