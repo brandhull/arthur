@@ -1,8 +1,48 @@
 import SwiftUI
 
+/// The shared text-entry+placeholder body for "append to today's daily
+/// note" — extracted out of AddNoteSheet so QuickAddModal's inline "New
+/// Reflection" compose box (Mac sidebar redesign) can reuse the exact same
+/// placeholder/PlainTextEditor logic instead of a second hand-copied version.
+struct DailyNoteComposeBox: View {
+    @ObservedObject var store: TaskStore
+    @Binding var text: String
+    let effectiveScheme: ColorScheme
+    let inputFontSize: CGFloat
+
+    var body: some View {
+        // Switched from serif to system font — Brandon wanted this compose
+        // box, Add Task's Task field, and Quick Capture's Capture box to all
+        // read as the same field (they'd drifted inconsistent), overriding
+        // the earlier "matches how you'll read it back" reasoning for
+        // keeping this one serif. The saved note's read-only display in
+        // ReflectionView still uses serif — this is just the compose/input
+        // experience.
+        FieldBox(scheme: effectiveScheme) {
+            ZStack(alignment: .topLeading) {
+                // Same placeholder treatment as Quick Capture's Capture
+                // field, for consistency — TextEditor has no native
+                // placeholder support.
+                if text.isEmpty {
+                    Text("Nothing here yet.")
+                        .font(.system(size: inputFontSize))
+                        .foregroundStyle(Theme.secondaryText(effectiveScheme))
+                        .padding(12)
+                        .allowsHitTesting(false)
+                }
+                PlainTextEditor(text: $text, fontSize: inputFontSize, scheme: effectiveScheme)
+                    .frame(minHeight: 160)
+            }
+        }
+    }
+}
+
 /// Built with FieldBox rather than native Form — matches the app-wide 8pt
 /// corner radius (ContentBox/PillButton/Tasks List) instead of native Form's
-/// grouped-section rounding.
+/// grouped-section rounding. Still iOS/iPadOS's only way to reach "append to
+/// daily note" (via the floating "+" menu) — Mac now also offers this
+/// inline, via QuickAddModal's "New Reflection" option, using the same
+/// DailyNoteComposeBox above rather than this sheet.
 struct AddNoteSheet: View {
     @ObservedObject var store: TaskStore
     @Environment(\.dismiss) private var dismiss
@@ -27,36 +67,8 @@ struct AddNoteSheet: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
-                FieldBox(scheme: effectiveScheme) {
-                    // Switched from serif to system font — Brandon wanted
-                    // this compose box, Add Task's Task field, and Quick
-                    // Capture's Capture box to all read as the same field
-                    // (they'd drifted inconsistent), overriding the earlier
-                    // "matches how you'll read it back" reasoning for
-                    // keeping this one serif. The saved note's read-only
-                    // display in DailyNoteView still uses serif — this is
-                    // just the compose/input experience.
-                    ZStack(alignment: .topLeading) {
-                        // Same placeholder treatment as Quick Capture's
-                        // Capture field, for consistency — TextEditor has
-                        // no native placeholder support.
-                        if text.isEmpty {
-                            Text("Nothing here yet.")
-                                .font(.system(size: inputFontSize))
-                                .foregroundStyle(Theme.secondaryText(effectiveScheme))
-                                // Same uniform .padding(12) as the Tasks/Daily
-                                // Note placeholders — this must match exactly
-                                // across all four empty states, so the cursor
-                                // alignment fix below happens on the
-                                // TextEditor's side instead of here.
-                                .padding(12)
-                                .allowsHitTesting(false)
-                        }
-                        PlainTextEditor(text: $text, fontSize: inputFontSize, scheme: effectiveScheme)
-                            .frame(minHeight: 160)
-                    }
-                }
-                .padding(.top, 16)
+                DailyNoteComposeBox(store: store, text: $text, effectiveScheme: effectiveScheme, inputFontSize: inputFontSize)
+                    .padding(.top, 16)
             }
             .foregroundStyle(Theme.primary(effectiveScheme))
             .background(Theme.background(effectiveScheme))

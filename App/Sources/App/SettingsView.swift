@@ -3,13 +3,16 @@ import ArthurKit
 
 /// Built with FieldBox/FieldLabel rather than native Form — matches the
 /// app-wide 8pt corner radius (ContentBox/PillButton/Tasks List) instead of
-/// native Form's grouped-section rounding. The two explicit exceptions,
-/// left as native controls: the Appearance segmented picker (System/Light/
-/// Dark) and the Task filter pill (not on this screen at all). The Inbox
-/// documents list stays a real List (not FieldBox) so drag-to-reorder and
-/// swipe-to-delete keep working — those depend on List's own machinery —
-/// but its background is hidden and redrawn at the same 8pt radius so it
-/// still matches everything else visually.
+/// native Form's grouped-section rounding. The Inbox documents list stays a
+/// real List (not FieldBox) so drag-to-reorder and swipe-to-delete keep
+/// working — those depend on List's own machinery — but its background is
+/// hidden and redrawn at the same 8pt radius so it still matches everything
+/// else visually.
+///
+/// Appearance (System/Light/Dark) used to live here as a segmented picker —
+/// moved out to AppearanceSwitcher (3 always-visible icon buttons, top-right
+/// of the Mac main pane) as part of the sidebar redesign, so Settings no
+/// longer touches store.config.appearance at all.
 struct SettingsView: View {
     @ObservedObject var store: TaskStore
     @ObservedObject var documentStore: DocumentStore
@@ -17,13 +20,13 @@ struct SettingsView: View {
     @Environment(\.colorScheme) private var systemScheme
 
     @State private var craftLink: String = ""
-    @State private var appearance: AppearanceMode = .system
 
-    // Live, not store.config — reflects the Picker selection below as you
-    // change it, so switching Light/Dark previews immediately in this
-    // window's own background rather than waiting for Done to be tapped.
+    // Reads store.config directly — Settings no longer has its own Appearance
+    // picker (moved to AppearanceSwitcher, top-right of the Mac main pane),
+    // so there's nothing left to preview live before Save; this just tracks
+    // whatever's already active.
     private var effectiveScheme: ColorScheme {
-        Theme.effectiveScheme(appearance: appearance, system: systemScheme)
+        Theme.effectiveScheme(appearance: store.config.appearance, system: systemScheme)
     }
     @State private var inboxes: [InboxDestination] = []
     @State private var defaultInboxId: String?
@@ -341,18 +344,6 @@ struct SettingsView: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 8)
 
-                    // Appearance segmented control — left native, per
-                    // Brandon's explicit exception (along with the Task
-                    // filter pill elsewhere) from the roundedness cleanup.
-                    FieldLabel(title: "Appearance")
-                    Picker("Appearance", selection: $appearance) {
-                        Text("System").tag(AppearanceMode.system)
-                        Text("Light").tag(AppearanceMode.light)
-                        Text("Dark").tag(AppearanceMode.dark)
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal, 20)
-
                     FieldLabel(title: "Sync")
                     Button {
                         Task {
@@ -456,7 +447,7 @@ struct SettingsView: View {
             }
             .onAppear(perform: loadFromStore)
         }
-        .preferredColorScheme(appearance == .system ? nil : effectiveScheme)
+        .preferredColorScheme(store.config.appearance == .system ? nil : effectiveScheme)
         #if os(macOS)
         .frame(minWidth: 420, idealWidth: 460, minHeight: 480, idealHeight: 560)
         #endif
@@ -466,7 +457,6 @@ struct SettingsView: View {
         hasDebugLog = FileManager.default.fileExists(atPath: debugLogURL.path)
         hasTaskTraceLog = FileManager.default.fileExists(atPath: taskTraceLogURL.path)
         craftLink = store.config.craftLink
-        appearance = store.config.appearance
         inboxes = store.config.inboxes
         defaultInboxId = store.config.defaultInboxId
         baserowToken = store.config.baserowToken
@@ -538,7 +528,6 @@ struct SettingsView: View {
             defaultInboxId = nil
         }
         store.config.craftLink = craftLink
-        store.config.appearance = appearance
         store.config.inboxes = inboxes
         store.config.defaultInboxId = defaultInboxId
         store.config.baserowToken = baserowToken

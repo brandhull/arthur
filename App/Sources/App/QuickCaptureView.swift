@@ -9,9 +9,11 @@ enum QuickCaptureSource: String, CaseIterable, Identifiable, Hashable {
 
 /// Combines the two former standalone tabs — free-form text pushed to any
 /// Craft page, and a row pushed into any configured Baserow table — behind
-/// one Craft/Baserow toggle, per Brandon's request. The toggle uses
+/// one Craft/Baserow toggle. On iOS/iPadOS that's still an in-view
 /// PillFilterBar, the same component (not just the same look) as the Tasks
-/// filter, at the same position in the header row.
+/// filter. On Mac (sidebar redesign) the toggle moved out to two nested
+/// sidebar rows under "Quick Capture" — `source` is an external binding so
+/// either owner can drive it identically.
 struct QuickCaptureView: View {
     @ObservedObject var store: TaskStore
     @ObservedObject var documentStore: DocumentStore
@@ -24,7 +26,11 @@ struct QuickCaptureView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
 
-    @State private var source: QuickCaptureSource = .craft
+    // External binding, not internal @State — on Mac the sidebar's nested
+    // Craft/Baserow rows drive this directly (no in-view pill there); on
+    // iOS the owner (AgendaView) still feeds it straight into the unchanged
+    // PillFilterBar toggle below, so nothing looks different there.
+    @Binding var source: QuickCaptureSource
 
     // MARK: Craft state
     // craftText/addSeparator used to be local @State here — now they live
@@ -93,6 +99,23 @@ struct QuickCaptureView: View {
     }
 
     var body: some View {
+        #if os(macOS)
+        macBody
+        #else
+        iosBody
+        #endif
+    }
+
+    private func handleOnAppear() {
+        documentStore.refreshIfStale(craftLink: store.config.craftLink)
+        if databaseId == nil, let lastDb = store.config.lastBaserowDatabaseId,
+           store.config.baserowDatabases.contains(where: { $0.id == lastDb }) {
+            databaseId = lastDb
+        }
+    }
+
+    #if os(iOS)
+    private var iosBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 10) {
@@ -101,33 +124,14 @@ struct QuickCaptureView: View {
                         selection: $source, scheme: effectiveScheme, fontSize: filterFontSize
                     )
                     Spacer()
-                    #if os(macOS)
-                    // Same row as the Craft/Baserow filter, not overlaid on
-                    // the capture box itself — Brandon: overlaid on the box
-                    // it clipped against the box's own rounded border.
-                    // Craft-only, since the pop-out has nothing to do with
-                    // a Baserow row.
-                    if source == .craft {
-                        Button {
-                            openWindow(id: "quickCapturePopout")
-                        } label: {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(.system(size: 14))
-                                .foregroundStyle(Theme.secondaryText(effectiveScheme))
-                                .frame(width: 28, height: 28)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .help("Open in a separate window")
-                    }
-                    #endif
                 }
                 .padding(.horizontal, 20)
                 .frame(height: Theme.headerRowHeight)
                 .foregroundStyle(Theme.primary(effectiveScheme))
 
                 if source == .craft {
-                    craftSection
+                    craftCaptureBox
+                    craftDestinationSection
                 } else {
                     baserowSection
                 }
@@ -135,19 +139,78 @@ struct QuickCaptureView: View {
             .padding(.bottom, 16)
         }
         .foregroundStyle(Theme.primary(effectiveScheme))
-        .onAppear {
-            documentStore.refreshIfStale(craftLink: store.config.craftLink)
-            if databaseId == nil, let lastDb = store.config.lastBaserowDatabaseId,
-               store.config.baserowDatabases.contains(where: { $0.id == lastDb }) {
-                databaseId = lastDb
+        .onAppear(perform: handleOnAppear)
+    }
+    #endif
+
+    #if os(macOS)
+    /// Craft/Baserow is picked in the sidebar now (nested rows under Quick
+    /// Capture), not an in-view pill — this row exists only to hold the
+    /// pop-out button, Craft-only, same header-row height every other tab
+    /// uses. Below that: the capture box fills the main pane, and the
+    /// destination picker/Add Separator/Save sit in a bottom-docked panel —
+    /// per Brandon's request to move the destination controls out of the
+    /// main typing area. Baserow has no equivalent free-text main-pane
+    /// content, so its whole form (Database → Table → fields → Push) just
+    /// fills the main pane directly, per Brandon's explicit call.
+    private var macBody: some View {
+        VStack(spacing: 0) {
+            if source == .craft {
+                HStack {
+                    Spacer()
+                    popoutButton
+                }
+                .padding(.horizontal, 20)
+                .frame(height: Theme.headerRowHeight)
+                .foregroundStyle(Theme.primary(effectiveScheme))
+
+                ScrollView {
+                    craftCaptureBox
+                        .padding(.bottom, 16)
+                }
+                .frame(maxHeight: .infinity)
+
+                Divider()
+
+                ScrollView {
+                    craftDestinationSection
+                        .padding(.vertical, 16)
+                }
+                .frame(maxHeight: 280)
+                .background(Theme.primary(effectiveScheme).opacity(0.03))
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        baserowSection
+                    }
+                    .padding(.top, 16)
+                    .padding(.bottom, 16)
+                }
             }
         }
+        .foregroundStyle(Theme.primary(effectiveScheme))
+        .onAppear(perform: handleOnAppear)
     }
+
+    private var popoutButton: some View {
+        Button {
+            openWindow(id: "quickCapturePopout")
+        } label: {
+            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                .font(.system(size: 14))
+                .foregroundStyle(Theme.secondaryText(effectiveScheme))
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Open in a separate window")
+    }
+    #endif
 
     // MARK: - Craft section (formerly CaptureSheet)
 
     @ViewBuilder
-    private var craftSection: some View {
+    private var craftCaptureBox: some View {
         FieldBox(scheme: effectiveScheme) {
             ZStack(alignment: .topLeading) {
                 if draft.text.isEmpty {
@@ -167,7 +230,10 @@ struct QuickCaptureView: View {
             }
         }
         .padding(.top, 16)
+    }
 
+    @ViewBuilder
+    private var craftDestinationSection: some View {
         // Bumped from 4 — Brandon: it read as too close to the Capture box
         // above it.
         FieldLabel(title: "Destination", topPadding: 10)

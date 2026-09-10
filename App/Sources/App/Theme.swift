@@ -194,4 +194,12 @@ enum Theme {
         #endif
     }
 
+    /// Mac sidebar resize bounds (the sidebar redesign's HSplitView leading
+    /// child). Not platform-conditional — this whole token group is only
+    /// ever read from Mac-only files, but lives here rather than a separate
+    /// token system so every new file still pulls colors/spacing from one
+    /// place.
+    static let sidebarMinWidth: CGFloat = 180
+    static let sidebarIdealWidth: CGFloat = 220
+    static let sidebarMaxWidth: CGFloat = 320
 }

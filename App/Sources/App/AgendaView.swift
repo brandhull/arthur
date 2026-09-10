@@ -30,6 +30,11 @@ struct AgendaView: View {
     @State private var showingAddTask = false
     @State private var showingAddNote = false
     @State private var selectedTab: HomeTab = .rocks
+    // Owns Quick Capture's Craft/Baserow selection here (not internal to
+    // QuickCaptureView) so the Mac sidebar's nested Craft/Baserow rows and
+    // iOS's in-view PillFilterBar toggle can both drive the exact same
+    // state, just through different UI.
+    @State private var quickCaptureSource: QuickCaptureSource = .craft
 
     private var effectiveScheme: ColorScheme {
         switch store.config.appearance {
@@ -93,42 +98,18 @@ struct AgendaView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            VStack(spacing: 0) {
-                topBar
-                tabSelector
-                    .padding(.horizontal, 20)
-                    .padding(.top, 28)
-                    .padding(.bottom, 16)
-
-                // All four tabs stay mounted (opacity-swapped, not
-                // conditionally created/destroyed) so switching tabs never
-                // loses in-progress state — a partially-typed Quick Capture
-                // note or an in-progress task edit survives a trip to
-                // another tab and back, the same way a native TabView keeps
-                // its tabs alive in the background.
-                ZStack {
-                    RocksView(store: store)
-                        .opacity(selectedTab == .rocks ? 1 : 0)
-                        .allowsHitTesting(selectedTab == .rocks)
-                    taskSection
-                        .opacity(selectedTab == .tasks ? 1 : 0)
-                        .allowsHitTesting(selectedTab == .tasks)
-                    QuickCaptureView(store: store, documentStore: documentStore)
-                        .opacity(selectedTab == .quickCapture ? 1 : 0)
-                        .allowsHitTesting(selectedTab == .quickCapture)
-                    ReflectionView(store: store)
-                        .opacity(selectedTab == .reflection ? 1 : 0)
-                        .allowsHitTesting(selectedTab == .reflection)
-                }
+        Group {
+            #if os(macOS)
+            MacAgendaLayout(
+                store: store, selectedTab: $selectedTab, quickCaptureSource: $quickCaptureSource,
+                showingSettings: $showingSettings, showingAddTask: $showingAddTask,
+                effectiveScheme: effectiveScheme
+            ) {
+                tabContent
             }
-
-            // 32, not 24 — Brandon: it was resting right on the ContentBox's
-            // own border lines. Since this is a single uniform padding value
-            // in a .bottomTrailing overlay, bumping it moves the button up
-            // and to the left by the same amount in both directions.
-            floatingAddButton
-                .padding(32)
+            #else
+            iosBody
+            #endif
         }
         .background(Theme.background(effectiveScheme))
         .preferredColorScheme(store.config.appearance == .system ? nil : effectiveScheme)
@@ -198,6 +179,57 @@ struct AgendaView: View {
         })
     }
 
+    /// All four tabs stay mounted (opacity-swapped, not conditionally
+    /// created/destroyed) so switching tabs never loses in-progress state —
+    /// a partially-typed Quick Capture note or an in-progress task edit
+    /// survives a trip to another tab and back, the same way a native
+    /// TabView keeps its tabs alive in the background. Built exactly once
+    /// here and handed to both platforms' chrome (iosBody's ZStack,
+    /// MacAgendaLayout's main pane) so there's a single place that ever
+    /// instantiates these four views — the Mac sidebar redesign must not
+    /// grow a second, similar-looking copy that can drift out of sync.
+    private var tabContent: some View {
+        ZStack {
+            RocksView(store: store)
+                .opacity(selectedTab == .rocks ? 1 : 0)
+                .allowsHitTesting(selectedTab == .rocks)
+            TasksView(store: store)
+                .opacity(selectedTab == .tasks ? 1 : 0)
+                .allowsHitTesting(selectedTab == .tasks)
+            QuickCaptureView(store: store, documentStore: documentStore, source: $quickCaptureSource)
+                .opacity(selectedTab == .quickCapture ? 1 : 0)
+                .allowsHitTesting(selectedTab == .quickCapture)
+            ReflectionView(store: store)
+                .opacity(selectedTab == .reflection ? 1 : 0)
+                .allowsHitTesting(selectedTab == .reflection)
+        }
+    }
+
+    #if os(iOS)
+    /// iOS/iPadOS keep the pre-sidebar-redesign layout entirely — dropdown
+    /// nav + floating "+" button — unchanged. The Mac sidebar redesign only
+    /// ever affects the `#if os(macOS)` branch in `body`.
+    private var iosBody: some View {
+        ZStack(alignment: .bottomTrailing) {
+            VStack(spacing: 0) {
+                topBar
+                tabSelector
+                    .padding(.horizontal, 20)
+                    .padding(.top, 28)
+                    .padding(.bottom, 16)
+                tabContent
+            }
+
+            // 32, not 24 — Brandon: it was resting right on the ContentBox's
+            // own border lines. Since this is a single uniform padding value
+            // in a .bottomTrailing overlay, bumping it moves the button up
+            // and to the left by the same amount in both directions.
+            floatingAddButton
+                .padding(32)
+        }
+    }
+    #endif
+
     /// A circle with a "+" — replaces every tab's own inline Add button.
     /// Tapping it opens a menu of the three things that can be quickly
     /// added; picking one either opens the same modal sheet that button
@@ -205,6 +237,8 @@ struct AgendaView: View {
     /// (that one's a full tab now with its own Craft/Baserow toggle, not a
     /// modal, so there's nothing separate to open). Rocks isn't one of the
     /// three — it's edited in place via its own Edit button, not "added to."
+    /// iOS/iPadOS only now — Mac replaced this with the sidebar's
+    /// bubble.and.pencil quick-add modal.
     private var floatingAddButton: some View {
         Menu {
             Button("Task") { showingAddTask = true }
@@ -230,6 +264,7 @@ struct AgendaView: View {
     /// rather than a separate size scale reserved just for this label.
     private var headerDateSize: CGFloat { tabFontSize }
 
+    #if os(iOS)
     private var topBar: some View {
         HStack(spacing: 8) {
             Text(todayFormatted).font(.system(size: headerDateSize, weight: Theme.headingWeight))
@@ -243,13 +278,11 @@ struct AgendaView: View {
             // (Apple's minimum recommended size) rather than just the bare
             // glyph's own small bounding box.
             //
-            // Mac gets its own tighter value (10, half of iOS's 20) — the
-            // pin/gear pair there doesn't have the fat-finger problem this
-            // spacing was originally sized for (Mac has no touch targets to
-            // avoid overlapping), and Brandon flagged the pin as reading too
-            // far from the gear at the shared 20pt spacing.
+            // Mac's pin-on-top button used to live in this same row —
+            // relocated to MacAgendaLayout's own top bar as part of the
+            // sidebar redesign (this whole topBar is iOS/iPadOS-only now,
+            // used only from iosBody).
             HStack(spacing: iconSpacing) {
-                #if os(iOS)
                 Button {
                     // Universal link, not the calshow:// scheme — Google
                     // Calendar (if installed) claims this domain and
@@ -267,28 +300,6 @@ struct AgendaView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                #endif
-                #if os(macOS)
-                // Mac only — no window-level equivalent on iOS/iPadOS. Was a
-                // Settings toggle at first; Brandon: too many clicks for
-                // something he'd want to flip often, and the calendar icon's
-                // slot here is unused on Mac anyway. Brandon named the exact
-                // symbol ("mappin", not a filled/circle variant) and didn't
-                // want a text label — on/off state is conveyed by tint alone
-                // (accent when pinned, secondary when not), same pattern as
-                // the task checkbox's done/not-done color swap elsewhere.
-                Button {
-                    store.config.pinOnTop.toggle()
-                    store.config.save()
-                } label: {
-                    Image(systemName: "mappin")
-                        .font(.system(size: topBarIconSize))
-                        .foregroundStyle(store.config.pinOnTop ? Theme.accentBright : Theme.secondaryText(effectiveScheme))
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                #endif
                 Button {
                     showingSettings = true
                 } label: {
@@ -311,6 +322,7 @@ struct AgendaView: View {
         .padding(.bottom, 12)
         .foregroundStyle(Theme.primary(effectiveScheme))
     }
+    #endif
 
     /// One dropdown on every platform/size class — used to be folder tabs
     /// on iPad (regular width) and Mac, dropping to this dropdown only on
@@ -358,64 +370,4 @@ struct AgendaView: View {
         #endif
     }
 
-    /// Bumped up on Mac specifically — Brandon flagged the filter labels as
-    /// too small on a larger screen, same complaint as FieldLabel. iOS/
-    /// iPadOS weren't flagged, so they keep their original size.
-    private var filterFontSize: CGFloat {
-        #if os(macOS)
-        return 14
-        #else
-        return 13
-        #endif
-    }
-
-    private var taskSection: some View {
-        VStack(spacing: 0) {
-            // No "Tasks" heading here — the tab bar shows that now, and the
-            // Add button that used to sit at the trailing end of this row
-            // is gone too — the floating "+" button covers that now, so
-            // this row is just the filter pills.
-            HStack(spacing: 10) {
-                PillFilterBar(
-                    items: TaskFilter.allCases, label: \.rawValue,
-                    selection: $store.filter, scheme: effectiveScheme, fontSize: filterFontSize
-                )
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .frame(height: Theme.headerRowHeight)
-            .foregroundStyle(Theme.primary(effectiveScheme))
-
-            // Top padding matches Quick Capture's own FieldBox/FieldLabel
-            // spacing below its header row — see RocksView's comment for
-            // the full reasoning; same fix applied identically here.
-            ContentBox(scheme: effectiveScheme) {
-                if store.filteredTasks.isEmpty {
-                    // System font, not Noto Serif — Brandon's request; this is
-                    // a placeholder state, not real content.
-                    Text(store.isLoading ? "Loading…" : "Nothing here yet.")
-                        .font(.system(size: inputFontSize))
-                        .foregroundStyle(Theme.secondaryText(effectiveScheme))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                } else {
-                    List(store.filteredTasks) { task in
-                        TaskRowView(task: task, store: store)
-                            .listRowInsets(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
-                            .listRowBackground(Color.clear)
-                    }
-                    .listStyle(.plain)
-                    .cornerRadius(8)
-                    .scrollContentBackground(.hidden)
-                }
-            }
-            .padding(.top, 16)
-        }
-        // alignment: .top — otherwise frame(maxHeight: .infinity) centers this
-        // VStack's now-short content (heading + one line of empty-state text)
-        // within the tall imposed height, pushing content down with a gap
-        // above it. Wasn't visible before because the empty state used to
-        // have its own Spacers stretching the VStack to fill on its own.
-        .frame(maxHeight: .infinity, alignment: .top)
-    }
 }

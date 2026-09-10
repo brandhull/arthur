@@ -27,11 +27,14 @@ public struct CraftTask: Identifiable, Hashable {
     public var taskDate: Date? { scheduleDate ?? deadlineDate }
 }
 
-/// "All" and "Overdue" as separate filters are gone — Brandon: "this app is
-/// for quick use of tasks in Craft, not exhaustive use... I'll just go to
-/// the Craft app for that." Today now absorbs Overdue (anything due today
-/// or earlier), leaving just two filters instead of four.
+/// "Overdue" as a separate filter is gone — Brandon: "this app is for quick
+/// use of tasks in Craft, not exhaustive use... I'll just go to the Craft
+/// app for that." Today absorbs Overdue (anything due today or earlier).
+/// "All" was removed in that same pass, then reinstated once the Mac sidebar
+/// redesign gave Tasks room for a third pill — declared first so
+/// `CaseIterable`'s order renders "All / Today / Tomorrow".
 public enum TaskFilter: String, CaseIterable, Identifiable, Hashable {
+    case all = "All"
     case today = "Today"
     case tomorrow = "Tomorrow"
     public var id: String { rawValue }
@@ -41,6 +44,8 @@ public enum TaskBucketing {
     public static func matches(_ task: CraftTask, filter: TaskFilter, now: Date = Date()) -> Bool {
         let cal = Calendar.current
         switch filter {
+        case .all:
+            return true
         case .today:
             // <= today, not isDate(inSameDayAs:) — this is what absorbs the
             // old separate "Overdue" filter into Today.
