@@ -35,6 +35,17 @@ struct TasksView: View {
         #endif
     }
 
+    // See RocksView's identical comment — Mac's sidebar redesign wants
+    // display content flowing without a border, reserving borders for
+    // actual forms (Baserow's Database/Table pickers).
+    private var contentBordered: Bool {
+        #if os(macOS)
+        return false
+        #else
+        return true
+        #endif
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // No "Tasks" heading here — the tab bar shows that now, and the
@@ -55,7 +66,7 @@ struct TasksView: View {
             // Top padding matches Quick Capture's own FieldBox/FieldLabel
             // spacing below its header row — see RocksView's comment for
             // the full reasoning; same fix applied identically here.
-            ContentBox(scheme: effectiveScheme) {
+            ContentBox(scheme: effectiveScheme, bordered: contentBordered) {
                 if store.filteredTasks.isEmpty {
                     // System font, not Noto Serif — Brandon's request; this is
                     // a placeholder state, not real content.

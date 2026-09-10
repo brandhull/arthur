@@ -64,10 +64,14 @@ struct SidebarView: View {
                 // indented, independently-selectable rows beneath it
                 // (Craft/Baserow) — its content is always one or the other,
                 // never an undifferentiated third state, so the parent label
-                // itself doesn't need to be tappable.
+                // itself doesn't need to be tappable. Same font/size/color as
+                // every other nav row (Brandon: all sidebar text should read
+                // as one uniform style, not a visually distinct section
+                // header) — only the missing dot and disabled tap tell it
+                // apart from an active/inactive leaf row.
                 Text(HomeTab.quickCapture.rawValue)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.secondaryText(effectiveScheme))
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(Theme.primary(effectiveScheme))
                     .padding(.horizontal, 14)
                     .padding(.top, 10)
                     .padding(.bottom, 2)
@@ -103,10 +107,10 @@ struct SidebarView: View {
                     Image(systemName: "gearshape")
                         .font(.system(size: 14))
                     Text("Settings")
-                        .font(.system(size: 13))
+                        .font(.system(size: 13, weight: .regular))
                     Spacer()
                 }
-                .foregroundStyle(Theme.secondaryText(effectiveScheme))
+                .foregroundStyle(Theme.primary(effectiveScheme))
                 .padding(.horizontal, 14)
                 .frame(height: 32)
                 .contentShape(Rectangle())
