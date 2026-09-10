@@ -65,7 +65,6 @@ struct QuickCaptureView: View {
     @State private var tableId: Int?
     @State private var tables: [BaserowTable] = []
     @State private var fields: [BaserowField] = []
-    @State private var skippedFieldNames: [String] = []
     @State private var textValues: [Int: String] = [:]
     @State private var boolValues: [Int: Bool] = [:]
     @State private var multiSelectValues: [Int: Set<String>] = [:]
@@ -528,14 +527,6 @@ struct QuickCaptureView: View {
                 ForEach(fields) { field in
                     fieldInput(for: field)
                 }
-
-                if !skippedFieldNames.isEmpty {
-                    Text("Skipped (unsupported): \(skippedFieldNames.joined(separator: ", "))")
-                        .font(.caption)
-                        .foregroundStyle(Theme.secondaryText(effectiveScheme))
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
-                }
             }
 
             if let baserowErrorMessage {
@@ -704,15 +695,17 @@ struct QuickCaptureView: View {
 
     private func loadFields(for tableId: Int?) async {
         fields = []
-        skippedFieldNames = []
         clearFieldValues()
         guard let tableId else { return }
         isLoadingFields = true
         defer { isLoadingFields = false }
         do {
             let all = try await baserowClient.listFields(tableId: tableId)
-            fields = all.filter { $0.isWritable }
-            skippedFieldNames = all.filter { !$0.isWritable }.map { $0.name }
+            // "Archived" specifically excluded, on top of the isWritable
+            // filter — Brandon: it's Baserow bookkeeping he doesn't want
+            // showing up (or accidentally set) in the Quick Capture form,
+            // across any table that happens to have a field by that name.
+            fields = all.filter { $0.isWritable && $0.name.caseInsensitiveCompare("Archived") != .orderedSame }
             baserowErrorMessage = nil
         } catch {
             baserowErrorMessage = error.localizedDescription

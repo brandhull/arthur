@@ -34,12 +34,12 @@ public enum AppearanceMode: String, Codable, CaseIterable, Identifiable {
 /// membership — see the cloud sync section below load()/save(). Storage
 /// backend is isolated behind this single load/save pair specifically so
 /// that transition didn't need to touch any call site in the App or Bar
-/// targets.
+/// targets. One deliberate exception: `appearance` (see its own comment
+/// below) is local-only per device, not part of the synced payload at all.
 public struct Config: Codable {
     public var craftLink: String
     public var inboxes: [InboxDestination]
     public var defaultInboxId: String?
-    public var appearance: AppearanceMode
     public var baserowToken: String
     public var baserowDatabases: [BaserowDatabase]
     public var lastBaserowDatabaseId: Int?
@@ -67,7 +67,7 @@ public struct Config: Codable {
     public var lastModified: Date
 
     public init(craftLink: String = "", inboxes: [InboxDestination] = [],
-                defaultInboxId: String? = nil, appearance: AppearanceMode = .platformDefault,
+                defaultInboxId: String? = nil,
                 baserowToken: String = "",
                 baserowDatabases: [BaserowDatabase] = [],
                 lastBaserowDatabaseId: Int? = nil, lastBaserowTableId: Int? = nil,
@@ -78,7 +78,6 @@ public struct Config: Codable {
         self.craftLink = craftLink
         self.inboxes = inboxes
         self.defaultInboxId = defaultInboxId
-        self.appearance = appearance
         self.baserowToken = baserowToken
         self.baserowDatabases = baserowDatabases
         self.lastBaserowDatabaseId = lastBaserowDatabaseId
@@ -101,7 +100,9 @@ public struct Config: Codable {
         craftLink = try c.decodeIfPresent(String.self, forKey: .craftLink) ?? ""
         inboxes = try c.decodeIfPresent([InboxDestination].self, forKey: .inboxes) ?? []
         defaultInboxId = try c.decodeIfPresent(String.self, forKey: .defaultInboxId)
-        appearance = try c.decodeIfPresent(AppearanceMode.self, forKey: .appearance) ?? .platformDefault
+        // appearance intentionally NOT decoded here — see the computed
+        // property below, which is why it's excluded from CodingKeys/this
+        // custom decoder entirely.
         baserowToken = try c.decodeIfPresent(String.self, forKey: .baserowToken) ?? ""
         baserowDatabases = try c.decodeIfPresent([BaserowDatabase].self, forKey: .baserowDatabases) ?? []
         lastBaserowDatabaseId = try c.decodeIfPresent(Int.self, forKey: .lastBaserowDatabaseId)
@@ -121,6 +122,33 @@ public struct Config: Codable {
     /// must stay there even after Business/BYUI/Church docs are configured.
     public var defaultInbox: InboxDestination? {
         inboxes.first { $0.id == defaultInboxId }
+    }
+
+    /// Deliberately NOT a stored property, and NOT part of the synced blob
+    /// (Codable's synthesized CodingKeys/encode skip computed properties
+    /// automatically) — Brandon: toggling appearance on Mac was live-
+    /// updating iPad's appearance too, since it used to be one field inside
+    /// the same Config that syncs everything else across devices via
+    /// iCloud. Appearance is a per-device/display preference (bright iPad
+    /// outdoors vs. a dim Mac at a desk), not an account setting like
+    /// craftLink/inboxes/Baserow — so it's read/written straight to this
+    /// device's own UserDefaults instead, with no cross-device propagation
+    /// at all. Reading/writing this never touches save()/lastModified/
+    /// iCloud, so flipping it doesn't spuriously re-push the rest of Config
+    /// to other devices either.
+    private static let appearanceDefaultsKey = "arthur.localAppearance"
+
+    public var appearance: AppearanceMode {
+        get {
+            guard let raw = UserDefaults.standard.string(forKey: Self.appearanceDefaultsKey),
+                  let mode = AppearanceMode(rawValue: raw) else {
+                return .platformDefault
+            }
+            return mode
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: Self.appearanceDefaultsKey)
+        }
     }
 
     /// A shared file under ~/Library/Application Support/Arthur, not
