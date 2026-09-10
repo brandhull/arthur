@@ -342,10 +342,18 @@ struct QuickCaptureView: View {
         // every Craft capture by hand, specifically for readability on the
         // Departmental Meetings/1:1s sub-pages — this saves that manual
         // step, on by default since that's his common case.
-        Toggle("Add Separator", isOn: $draft.addSeparator)
-            .font(.system(size: inputFontSize))
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
+        //
+        // Right-aligned (a leading Spacer, not the default leading-hugging
+        // Toggle layout) so it sits flush with the Save button's right
+        // edge below it — Brandon: left-aligned read as randomly centered
+        // relative to Save, not intentional.
+        HStack {
+            Spacer()
+            Toggle("Add Separator", isOn: $draft.addSeparator)
+                .font(.system(size: inputFontSize))
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
 
         if let craftErrorMessage {
             Text(craftErrorMessage)

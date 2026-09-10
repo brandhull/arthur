@@ -37,7 +37,13 @@ struct QuickAddModal: View {
             case .reflection: reflectionBody
             }
         }
-        .frame(width: mode == .menu ? 220 : 340)
+        // 260, not 340 — with arrowEdge: .bottom the popover centers
+        // horizontally on the sidebar's bubble.and.pencil button, which
+        // sits close to the window's left edge; 340 pushed roughly a third
+        // of the popover's width past that edge. 260 keeps it comfortably
+        // within a typical sidebar-width window even fully collapsed to
+        // Theme.sidebarMinWidth.
+        .frame(width: mode == .menu ? 220 : 260)
         .background(Theme.background(effectiveScheme))
         .foregroundStyle(Theme.primary(effectiveScheme))
         // Reset back to the menu each time the popover is reopened, rather

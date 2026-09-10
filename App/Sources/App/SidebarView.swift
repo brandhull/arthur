@@ -41,14 +41,18 @@ struct SidebarView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                // .trailing, not .bottom — .bottom centers the popover
-                // under the anchor, and this button sits close enough to
-                // the sidebar's left edge that the wider "New Reflection"
-                // compose state (340pt) got pushed left of the window
-                // entirely, clipping its own title. Anchoring to the
-                // trailing edge only ever grows rightward, so it can't
-                // overflow off the left regardless of width.
-                .popover(isPresented: $showingQuickAdd, arrowEdge: .trailing) {
+                // .bottom — grows downward from the button, away from the
+                // window's top edge (this button sits right at the top of
+                // the sidebar, so any edge that grows upward or is
+                // vertically centered on it pushes part of the popover
+                // above the window). NSPopover positions relative to the
+                // screen, not the parent window, and does NOT clip itself
+                // to the window's bounds — confirmed live that it was
+                // genuinely rendering outside Arthur's own window, not just
+                // a screenshot artifact. QuickAddModal's width is capped
+                // (see its own comment) to also avoid overflowing left,
+                // since .bottom still centers horizontally.
+                .popover(isPresented: $showingQuickAdd, arrowEdge: .bottom) {
                     QuickAddModal(
                         store: store, selectedTab: $selectedTab,
                         showingAddTask: $showingAddTask, isPresented: $showingQuickAdd
@@ -75,13 +79,19 @@ struct SidebarView: View {
                 // every other nav row (Brandon: all sidebar text should read
                 // as one uniform style, not a visually distinct section
                 // header) — only the missing dot and disabled tap tell it
-                // apart from an active/inactive leaf row.
+                // apart from an active/inactive leaf row. Same fixed 30pt
+                // row height too, not its own top/bottom padding — that
+                // used to make the gap above it (from Tasks) read as 12pt
+                // while the gap below it (to Craft) read as only 4pt, so
+                // Craft looked oddly "closer" to the label than every other
+                // row is to its neighbor. Every row-to-row gap is now
+                // exactly the same, set purely by this VStack's own
+                // `spacing: 2`.
                 Text(HomeTab.quickCapture.rawValue)
                     .font(.system(size: 14, weight: .regular))
                     .foregroundStyle(Theme.primary(effectiveScheme))
                     .padding(.horizontal, 14)
-                    .padding(.top, 10)
-                    .padding(.bottom, 2)
+                    .frame(height: 30)
                 navRow(
                     title: QuickCaptureSource.craft.rawValue,
                     isActive: selectedTab == .quickCapture && quickCaptureSource == .craft,

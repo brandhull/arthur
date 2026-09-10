@@ -5,7 +5,7 @@ import SwiftUI
 @MainActor
 final class TaskStore: ObservableObject {
     @Published var tasks: [CraftTask] = []
-    @Published var filter: TaskFilter = .today
+    @Published var filter: TaskFilter = .all
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var config: Config = Config.load()
