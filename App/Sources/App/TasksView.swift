@@ -24,14 +24,15 @@ struct TasksView: View {
         #endif
     }
 
-    /// Bumped up on Mac specifically — Brandon flagged the filter labels as
+    /// Mac: bumped up specifically — Brandon flagged the filter labels as
     /// too small on a larger screen, same complaint as FieldLabel. iOS/
-    /// iPadOS weren't flagged, so they keep their original size.
+    /// iPadOS now match Theme.inputFontSize (= the header date's own size),
+    /// part of collapsing every scattered iOS text size to one standard.
     private var filterFontSize: CGFloat {
         #if os(macOS)
         return 14
         #else
-        return 13
+        return inputFontSize
         #endif
     }
 

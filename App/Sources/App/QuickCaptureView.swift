@@ -194,9 +194,18 @@ struct QuickCaptureView: View {
     /// just this header row so the capture box above gets that space back.
     private var destinationHeader: some View {
         HStack {
+            // Mac keeps 15; iOS/iPadOS now match Theme.inputFontSize, part
+            // of Brandon's ask to standardize every scattered iOS label
+            // size to the header date's own size.
+            #if os(macOS)
             Text("Destination")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Color.primary)
+            #else
+            Text("Destination")
+                .font(.system(size: Theme.inputFontSize(), weight: .semibold))
+                .foregroundStyle(Color.primary)
+            #endif
             Spacer()
             Button {
                 withAnimation(.easeInOut(duration: 0.15)) { isDestinationExpanded.toggle() }
@@ -733,7 +742,7 @@ struct QuickCaptureView: View {
 /// Mac — AppKit's Picker equivalent doesn't have this quirk. Building the
 /// label ourselves via `Menu` gives full control over font/color so it
 /// matches the surrounding Text exactly, on every platform.
-private struct MenuFieldPicker<Value: Hashable>: View {
+struct MenuFieldPicker<Value: Hashable>: View {
     let placeholder: String
     let options: [(label: String, value: Value)]
     let noneValue: Value

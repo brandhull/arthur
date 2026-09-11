@@ -123,7 +123,7 @@ struct PillActionButton: View {
         #if os(macOS)
         return 14
         #else
-        return 13
+        return Theme.inputFontSize()
         #endif
     }
 

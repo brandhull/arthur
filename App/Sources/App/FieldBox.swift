@@ -45,15 +45,15 @@ struct FieldLabel: View {
 
     var body: some View {
         Text(title)
-            // Fixed size on Mac, not the .subheadline Dynamic Type token —
-            // .subheadline resolves quite small on macOS specifically, and
-            // Brandon flagged it (along with the Task filter labels) as too
-            // small on a larger screen. iOS/iPadOS weren't flagged, so they
-            // keep the scalable token.
+            // Fixed size on both platforms now — Mac keeps its own 15
+            // (flagged too small on a larger screen at the old
+            // .subheadline token); iOS/iPadOS now match Theme.inputFontSize
+            // (= the header date's own size), part of Brandon's ask to
+            // collapse every scattered iOS text size down to one standard.
             #if os(macOS)
             .font(.system(size: 15, weight: .semibold))
             #else
-            .font(.system(.subheadline, weight: .semibold))
+            .font(.system(size: Theme.inputFontSize(), weight: .semibold))
             #endif
             .foregroundStyle(Color.primary)
             .padding(.horizontal, 20)

@@ -185,15 +185,22 @@ enum Theme {
     /// Task's Task field, Add Note's compose box, and Quick Capture's
     /// Capture box. Brandon: these had drifted inconsistent (Quick Capture
     /// noticeably smaller, Add Note still serif from an earlier decision)
-    /// and should read as the same field wherever you're typing, scaled up
-    /// a bit on larger screens rather than staying one fixed size
-    /// everywhere. Pass the environment's horizontalSizeClass on iOS/iPadOS
-    /// (nil/omitted defaults to the phone-width size).
+    /// and should read as the same field wherever you're typing.
+    ///
+    /// On iOS/iPadOS this is now literally `sectionHeadingSize` (the header
+    /// date's own size) — Brandon's explicit call for the redesign: rather
+    /// than several different sizes scattered across the app (13/14/15/16/
+    /// 18/20), everything on those two platforms should read at the one
+    /// size the date already uses, for readability on iPhone and
+    /// consistency between iPhone/iPad. No more horizontalSizeClass split —
+    /// that's what produced iPhone/iPad drifting to different sizes in the
+    /// first place. Mac is untouched (still fixed 14) — Brandon scoped this
+    /// standardization to "just those two platforms."
     static func inputFontSize(horizontalSizeClass: UserInterfaceSizeClass? = nil) -> CGFloat {
         #if os(macOS)
         return 14
         #else
-        return horizontalSizeClass == .regular ? 18 : 16
+        return sectionHeadingSize
         #endif
     }
 

@@ -53,6 +53,7 @@ struct AddTaskSheet: View {
                     FieldBox(scheme: effectiveScheme) {
                         VStack(alignment: .leading, spacing: 0) {
                             Toggle("Set a due date", isOn: $includeDueDate)
+                                .font(.system(size: inputFontSize))
                                 .padding(12)
                             if includeDueDate {
                                 Divider().padding(.leading, 12)
@@ -62,15 +63,19 @@ struct AddTaskSheet: View {
                         }
                     }
 
+                    // A native Picker here (as this used to be) ignores
+                    // explicit .font() sizing for its displayed value on
+                    // iOS — the exact "Bits"/"Brandon" bug Brandon flagged
+                    // in Baserow's Quick Capture form. Same MenuFieldPicker
+                    // fix applied here for the same reason.
                     FieldLabel(title: "Destination (optional)")
                     FieldBox(scheme: effectiveScheme) {
-                        Picker("Inbox", selection: $destinationId) {
-                            Text("Default (\(store.config.defaultInbox?.name ?? "Craft Inbox"))").tag(String?.none)
-                            ForEach(store.config.inboxes) { inbox in
-                                Text(inbox.name).tag(String?.some(inbox.id))
-                            }
-                        }
-                        .padding(12)
+                        MenuFieldPicker(
+                            placeholder: "Default (\(store.config.defaultInbox?.name ?? "Craft Inbox"))",
+                            options: store.config.inboxes.map { (label: $0.name, value: Optional($0.id)) },
+                            noneValue: Optional<String>.none,
+                            selection: $destinationId, fontSize: inputFontSize, scheme: effectiveScheme
+                        )
                     }
                 }
                 .padding(.bottom, 16)

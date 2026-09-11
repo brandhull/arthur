@@ -33,6 +33,14 @@ struct QuickAddModal: View {
         Theme.effectiveScheme(appearance: store.config.appearance, system: systemScheme)
     }
 
+    private var modalWidth: CGFloat {
+        #if os(macOS)
+        return mode == .menu ? 220 : 260
+        #else
+        return mode == .menu ? 260 : 300
+        #endif
+    }
+
     var body: some View {
         Group {
             switch mode {
@@ -46,7 +54,13 @@ struct QuickAddModal: View {
         // of the popover's width past that edge. 260 keeps it comfortably
         // within a typical sidebar-width window even fully collapsed to
         // Theme.sidebarMinWidth.
-        .frame(width: mode == .menu ? 220 : 260)
+        //
+        // iOS/iPadOS get wider frames (260/300, not 220/260) — the row/
+        // title text inside grew from 13pt to Theme.inputFontSize (20) as
+        // part of standardizing every iOS text size to the header date's
+        // own size, and the narrower Mac widths started clipping/wrapping
+        // that larger text.
+        .frame(width: modalWidth)
         .background(Theme.background(effectiveScheme))
         .foregroundStyle(Theme.primary(effectiveScheme))
         // Reset back to the menu each time the popover is reopened, rather
@@ -84,7 +98,14 @@ struct QuickAddModal: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Image(systemName: systemImage).frame(width: 18)
+                // Mac keeps 13; iOS/iPadOS now match Theme.inputFontSize —
+                // see modalWidth's comment for why the popover widened to
+                // match.
+                #if os(macOS)
                 Text(title).font(.system(size: 13))
+                #else
+                Text(title).font(.system(size: Theme.inputFontSize()))
+                #endif
                 Spacer()
             }
             .padding(.horizontal, 14)
@@ -97,7 +118,11 @@ struct QuickAddModal: View {
     private var reflectionBody: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("New Reflection")
+                #if os(macOS)
                 .font(.system(size: 13, weight: .semibold))
+                #else
+                .font(.system(size: Theme.inputFontSize(), weight: .semibold))
+                #endif
                 .padding(.horizontal, 14)
             DailyNoteComposeBox(
                 store: store, text: $reflectionText,

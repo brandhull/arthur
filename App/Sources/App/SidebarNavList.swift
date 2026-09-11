@@ -16,6 +16,25 @@ struct SidebarNavList: View {
     @Binding var showingSettings: Bool
     let effectiveScheme: ColorScheme
 
+    // Mac keeps its original 14pt/30pt-row sizing (unaffected by Brandon's
+    // iOS standardization ask); iOS/iPadOS now match Theme.inputFontSize
+    // (= the header date's own size) — the row height grows along with it
+    // so 20pt text isn't cramped in what was tuned for 14pt.
+    private var navFontSize: CGFloat {
+        #if os(macOS)
+        return 14
+        #else
+        return Theme.inputFontSize()
+        #endif
+    }
+    private var navRowHeight: CGFloat {
+        #if os(macOS)
+        return 30
+        #else
+        return 40
+        #endif
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
@@ -43,10 +62,10 @@ struct SidebarNavList: View {
                 // exactly the same, set purely by this VStack's own
                 // `spacing: 2`.
                 Text(HomeTab.quickCapture.rawValue)
-                    .font(.system(size: 14, weight: .regular))
+                    .font(.system(size: navFontSize, weight: .regular))
                     .foregroundStyle(Theme.primary(effectiveScheme))
                     .padding(.horizontal, 14)
-                    .frame(height: 30)
+                    .frame(height: navRowHeight)
                 navRow(
                     title: QuickCaptureSource.craft.rawValue,
                     isActive: selectedTab == .quickCapture && quickCaptureSource == .craft,
@@ -77,14 +96,14 @@ struct SidebarNavList: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "gearshape")
-                        .font(.system(size: 14))
+                        .font(.system(size: navFontSize))
                     Text("Settings")
-                        .font(.system(size: 14, weight: .regular))
+                        .font(.system(size: navFontSize, weight: .regular))
                     Spacer()
                 }
                 .foregroundStyle(Theme.primary(effectiveScheme))
                 .padding(.horizontal, 14)
-                .frame(height: 32)
+                .frame(height: navRowHeight + 2)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -97,11 +116,11 @@ struct SidebarNavList: View {
     private func navRow(title: String, isActive: Bool, indent: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                // 14pt system, default (primary) color, regular weight for
-                // every row — selection is conveyed by the dot alone, not a
-                // font-weight change, per Brandon's exact spec.
+                // Default (primary) color, regular weight for every row —
+                // selection is conveyed by the dot alone, not a font-weight
+                // change, per Brandon's exact spec.
                 Text(title)
-                    .font(.system(size: 14, weight: .regular))
+                    .font(.system(size: navFontSize, weight: .regular))
                     .foregroundStyle(Theme.primary(effectiveScheme))
                 Spacer()
                 if isActive {
@@ -112,7 +131,7 @@ struct SidebarNavList: View {
             }
             .padding(.leading, indent ? 26 : 14)
             .padding(.trailing, 14)
-            .frame(height: 30)
+            .frame(height: navRowHeight)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -80,19 +80,19 @@ struct MarkdownContentView: View {
                 .foregroundStyle(Theme.primary(scheme))
         case .bullet:
             HStack(alignment: .top, spacing: 8) {
-                Text("•").font(.system(size: 15))
-                Text(line.text).font(.system(size: 15)).lineSpacing(3)
+                Text("•").font(.system(size: bodySize))
+                Text(line.text).font(.system(size: bodySize)).lineSpacing(3)
             }
             .foregroundStyle(Theme.primary(scheme))
         case .numbered(let n):
             HStack(alignment: .top, spacing: 8) {
-                Text("\(n).").font(.system(size: 15))
-                Text(line.text).font(.system(size: 15)).lineSpacing(3)
+                Text("\(n).").font(.system(size: bodySize))
+                Text(line.text).font(.system(size: bodySize)).lineSpacing(3)
             }
             .foregroundStyle(Theme.primary(scheme))
         case .quote:
             Text(line.text)
-                .font(.system(size: 15))
+                .font(.system(size: bodySize))
                 .italic()
                 .lineSpacing(3)
                 .foregroundStyle(Theme.secondaryText(scheme))
@@ -102,18 +102,35 @@ struct MarkdownContentView: View {
                 }
         case .paragraph:
             Text(line.text)
-                .font(.system(size: 15))
+                .font(.system(size: bodySize))
                 .lineSpacing(3)
                 .foregroundStyle(Theme.primary(scheme))
         }
     }
 
+    /// Base body size for plain paragraphs/bullets/numbers/quotes — was a
+    /// flat 15 on every platform. Mac keeps that; iOS/iPadOS now match
+    /// Theme.inputFontSize (= the header date's own size), part of
+    /// Brandon's ask to standardize every scattered iOS text size,
+    /// including a Craft doc's own rendered content (Rocks/Reflection).
+    private var bodySize: CGFloat {
+        #if os(macOS)
+        return 15
+        #else
+        return Theme.inputFontSize()
+        #endif
+    }
+
+    /// Heading levels scale up from `bodySize` by the same deltas the old
+    /// flat-15 base used (+7/+4/+2/+1 for h1-h4), so a Craft doc's own
+    /// heading hierarchy still reads as bigger than body text on iOS at
+    /// the new, larger base rather than being flattened to one size.
     private func headingSize(for level: Int) -> CGFloat {
         switch level {
-        case 1: return 22
-        case 2: return 19
-        case 3: return 17
-        default: return 16
+        case 1: return bodySize + 7
+        case 2: return bodySize + 4
+        case 3: return bodySize + 2
+        default: return bodySize + 1
         }
     }
 }
