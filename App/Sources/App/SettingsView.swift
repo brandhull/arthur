@@ -28,6 +28,29 @@ struct SettingsView: View {
     private var effectiveScheme: ColorScheme {
         Theme.effectiveScheme(appearance: store.config.appearance, system: systemScheme)
     }
+
+    // nil on Mac (keeps every field/button at its original, un-styled
+    // system default — this screen isn't part of Brandon's iOS
+    // standardization ask on that platform), a fixed Theme.inputFontSize on
+    // iOS/iPadOS so every text field, list row, and button label here
+    // matches the rest of the app's new standard size instead of Settings'
+    // previous mix of un-styled system defaults.
+    private var fieldFont: Font? {
+        #if os(macOS)
+        return nil
+        #else
+        return .system(size: Theme.inputFontSize())
+        #endif
+    }
+
+    private var listRowHeight: CGFloat {
+        #if os(macOS)
+        return 44
+        #else
+        return 48
+        #endif
+    }
+
     @State private var inboxes: [InboxDestination] = []
     @State private var defaultInboxId: String?
     @State private var newInboxName = ""
@@ -75,6 +98,7 @@ struct SettingsView: View {
                             .textInputAutocapitalization(.never)
                             #endif
                             .autocorrectionDisabled()
+                            .font(fieldFont)
                             .padding(12)
                     }
 
@@ -83,7 +107,7 @@ struct SettingsView: View {
                         List {
                             ForEach(inboxes) { inbox in
                                 HStack {
-                                    Text(inbox.name)
+                                    Text(inbox.name).font(fieldFont)
                                     #if os(macOS)
                                     // macOS Lists have no swipe-to-delete
                                     // gesture, and .onDelete only fires via
@@ -113,7 +137,7 @@ struct SettingsView: View {
                         }
                         .listStyle(.plain)
                         .scrollContentBackground(.hidden)
-                        .frame(height: CGFloat(inboxes.count) * 44)
+                        .frame(height: CGFloat(inboxes.count) * listRowHeight)
                         .overlay(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .stroke(Theme.primary(effectiveScheme).opacity(Theme.borderOpacity), lineWidth: Theme.borderWidth)
@@ -126,6 +150,7 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 0) {
                             TextField("Name (e.g. Personal)", text: $newInboxName)
                                 .multilineTextAlignment(.leading)
+                                .font(fieldFont)
                                 .padding(12)
                             Divider().padding(.leading, 12)
                             TextField("Craft document URL", text: $newInboxURL)
@@ -134,6 +159,7 @@ struct SettingsView: View {
                                 .textInputAutocapitalization(.never)
                                 #endif
                                 .autocorrectionDisabled()
+                                .font(fieldFont)
                                 .padding(12)
                         }
                     }
@@ -147,7 +173,7 @@ struct SettingsView: View {
                             if isResolving {
                                 ProgressView()
                             } else {
-                                Text("Add inbox document")
+                                Text("Add inbox document").font(fieldFont)
                             }
                             Spacer()
                         }
@@ -172,6 +198,12 @@ struct SettingsView: View {
                     if !inboxes.isEmpty {
                         FieldLabel(title: "Default inbox")
                         FieldBox(scheme: effectiveScheme) {
+                            // iOS: a native Picker's displayed value ignores
+                            // explicit font sizing — same MenuFieldPicker
+                            // fix used for Baserow's/Add Task's fields. Mac
+                            // keeps the native Picker (no such bug there,
+                            // and unaffected by this iOS-only pass anyway).
+                            #if os(macOS)
                             Picker("Default", selection: $defaultInboxId) {
                                 Text("Craft Inbox (standard)").tag(String?.none)
                                 ForEach(inboxes) { inbox in
@@ -179,6 +211,14 @@ struct SettingsView: View {
                                 }
                             }
                             .padding(12)
+                            #else
+                            MenuFieldPicker(
+                                placeholder: "Craft Inbox (standard)",
+                                options: inboxes.map { (label: $0.name, value: Optional($0.id)) },
+                                noneValue: Optional<String>.none,
+                                selection: $defaultInboxId, fontSize: Theme.inputFontSize(), scheme: effectiveScheme
+                            )
+                            #endif
                         }
                     }
 
@@ -190,6 +230,7 @@ struct SettingsView: View {
                             .textInputAutocapitalization(.never)
                             #endif
                             .autocorrectionDisabled()
+                            .font(fieldFont)
                             .padding(12)
                     }
 
@@ -203,7 +244,7 @@ struct SettingsView: View {
                         List {
                             ForEach(baserowDatabases) { db in
                                 HStack {
-                                    Text(db.name)
+                                    Text(db.name).font(fieldFont)
                                     Spacer()
                                     // String(db.id), not Text("\(db.id)") —
                                     // interpolating an Int directly into a
@@ -212,6 +253,7 @@ struct SettingsView: View {
                                     // Baserow database ID into something that
                                     // looks like a different number entirely.
                                     Text(String(db.id))
+                                        .font(fieldFont)
                                         .foregroundStyle(Theme.secondaryText(effectiveScheme))
                                     #if os(macOS)
                                     // Same reason as the Inbox documents
@@ -236,7 +278,7 @@ struct SettingsView: View {
                         }
                         .listStyle(.plain)
                         .scrollContentBackground(.hidden)
-                        .frame(height: CGFloat(baserowDatabases.count) * 44)
+                        .frame(height: CGFloat(baserowDatabases.count) * listRowHeight)
                         .overlay(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .stroke(Theme.primary(effectiveScheme).opacity(Theme.borderOpacity), lineWidth: Theme.borderWidth)
@@ -249,6 +291,7 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 0) {
                             TextField("Name (e.g. Captures)", text: $newBaserowName)
                                 .multilineTextAlignment(.leading)
+                                .font(fieldFont)
                                 .padding(12)
                             Divider().padding(.leading, 12)
                             TextField("Database ID (number)", text: $newBaserowId)
@@ -256,6 +299,7 @@ struct SettingsView: View {
                                 .keyboardType(.numberPad)
                                 #endif
                                 .multilineTextAlignment(.leading)
+                                .font(fieldFont)
                                 .padding(12)
                         }
                     }
@@ -266,7 +310,7 @@ struct SettingsView: View {
                     } label: {
                         HStack {
                             Spacer()
-                            Text("Add database")
+                            Text("Add database").font(fieldFont)
                             Spacer()
                         }
                         .padding(12)
@@ -293,6 +337,9 @@ struct SettingsView: View {
                     // from for the splash screen, configured once here
                     // rather than re-picked every launch.
                     FieldBox(scheme: effectiveScheme) {
+                        // Same native-Picker-ignores-font fix as Default
+                        // inbox above.
+                        #if os(macOS)
                         Picker("Database", selection: $senecaDatabaseId) {
                             Text("Select a database").tag(Int?.none)
                             ForEach(baserowDatabases) { db in
@@ -300,6 +347,14 @@ struct SettingsView: View {
                             }
                         }
                         .padding(12)
+                        #else
+                        MenuFieldPicker(
+                            placeholder: "Select a database",
+                            options: baserowDatabases.map { (label: $0.name, value: Optional($0.id)) },
+                            noneValue: Optional<Int>.none,
+                            selection: $senecaDatabaseId, fontSize: Theme.inputFontSize(), scheme: effectiveScheme
+                        )
+                        #endif
                     }
                     .onChange(of: senecaDatabaseId) {
                         Task { await loadSenecaTables(for: senecaDatabaseId) }
@@ -309,6 +364,7 @@ struct SettingsView: View {
                         if isLoadingSenecaTables {
                             HStack { Spacer(); ProgressView(); Spacer() }.padding(12)
                         } else {
+                            #if os(macOS)
                             Picker("Table", selection: $senecaTableId) {
                                 Text(senecaTables.isEmpty ? "Select a database first" : "Select a table").tag(Int?.none)
                                 ForEach(senecaTables) { t in
@@ -317,6 +373,15 @@ struct SettingsView: View {
                             }
                             .padding(12)
                             .disabled(senecaTables.isEmpty)
+                            #else
+                            MenuFieldPicker(
+                                placeholder: senecaTables.isEmpty ? "Select a database first" : "Select a table",
+                                options: senecaTables.map { (label: $0.name, value: Optional($0.id)) },
+                                noneValue: Optional<Int>.none,
+                                selection: $senecaTableId, fontSize: Theme.inputFontSize(), scheme: effectiveScheme,
+                                disabled: senecaTables.isEmpty
+                            )
+                            #endif
                         }
                     }
                     .padding(.top, 8)
@@ -325,10 +390,12 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 0) {
                             TextField("Quote field name", text: $senecaQuoteField)
                                 .multilineTextAlignment(.leading)
+                                .font(fieldFont)
                                 .padding(12)
                             Divider().padding(.leading, 12)
                             TextField("Author field name (optional)", text: $senecaAuthorField)
                                 .multilineTextAlignment(.leading)
+                                .font(fieldFont)
                                 .padding(12)
                         }
                     }
@@ -368,7 +435,7 @@ struct SettingsView: View {
                             if isSyncing {
                                 ProgressView()
                             } else {
-                                Text("Force Sync")
+                                Text("Force Sync").font(fieldFont)
                             }
                             Spacer()
                         }
@@ -400,7 +467,7 @@ struct SettingsView: View {
                         ShareLink(item: debugLogURL) {
                             HStack {
                                 Spacer()
-                                Text("Share Craft Debug Log")
+                                Text("Share Craft Debug Log").font(fieldFont)
                                 Spacer()
                             }
                             .padding(12)
@@ -415,7 +482,7 @@ struct SettingsView: View {
                         ShareLink(item: taskTraceLogURL) {
                             HStack {
                                 Spacer()
-                                Text("Share Task-Add Trace")
+                                Text("Share Task-Add Trace").font(fieldFont)
                                 Spacer()
                             }
                             .padding(12)
