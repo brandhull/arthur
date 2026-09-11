@@ -442,13 +442,12 @@ struct QuickCaptureView: View {
         } else {
             FieldLabel(title: "Database")
             FieldBox(scheme: effectiveScheme) {
-                Picker("Database", selection: $databaseId) {
-                    Text("Select a database").tag(Int?.none)
-                    ForEach(store.config.baserowDatabases) { db in
-                        Text(db.name).tag(Int?.some(db.id))
-                    }
-                }
-                .padding(12)
+                MenuFieldPicker(
+                    placeholder: "Select a database",
+                    options: store.config.baserowDatabases.map { (label: $0.name, value: Optional($0.id)) },
+                    noneValue: Optional<Int>.none,
+                    selection: $databaseId, fontSize: inputFontSize, scheme: effectiveScheme
+                )
             }
             .onChange(of: databaseId) {
                 Task { await loadTables(for: databaseId) }
@@ -459,14 +458,13 @@ struct QuickCaptureView: View {
                 if isLoadingTables {
                     HStack { Spacer(); ProgressView(); Spacer() }.padding(12)
                 } else {
-                    Picker("Table", selection: $tableId) {
-                        Text(tables.isEmpty ? "Select a database first" : "Select a table").tag(Int?.none)
-                        ForEach(tables) { t in
-                            Text(t.name).tag(Int?.some(t.id))
-                        }
-                    }
-                    .padding(12)
-                    .disabled(tables.isEmpty)
+                    MenuFieldPicker(
+                        placeholder: tables.isEmpty ? "Select a database first" : "Select a table",
+                        options: tables.map { (label: $0.name, value: Optional($0.id)) },
+                        noneValue: Optional<Int>.none,
+                        selection: $tableId, fontSize: inputFontSize, scheme: effectiveScheme,
+                        disabled: tables.isEmpty
+                    )
                 }
             }
             .onChange(of: tableId) {
@@ -524,13 +522,12 @@ struct QuickCaptureView: View {
         case "single_select":
             FieldLabel(title: field.name)
             FieldBox(scheme: effectiveScheme) {
-                Picker(field.name, selection: textBinding(field.id)) {
-                    Text("— none —").tag("")
-                    ForEach(field.selectOptions ?? [], id: \.value) { opt in
-                        Text(opt.value).tag(opt.value)
-                    }
-                }
-                .padding(12)
+                MenuFieldPicker(
+                    placeholder: "— none —",
+                    options: (field.selectOptions ?? []).map { (label: $0.value, value: $0.value) },
+                    noneValue: "",
+                    selection: textBinding(field.id), fontSize: inputFontSize, scheme: effectiveScheme
+                )
             }
 
         case "multiple_select":
@@ -718,5 +715,52 @@ struct QuickCaptureView: View {
         } catch {
             baserowErrorMessage = error.localizedDescription
         }
+    }
+}
+
+/// Stand-in for SwiftUI's `Picker` in the Baserow form (Database, Table,
+/// single_select fields). A plain `Picker` outside a List ignores an
+/// explicit `.font()` for its own displayed selected-value button — it
+/// always renders in the system's own accent-blue control font/weight
+/// regardless of what we set `inputFontSize` to, which is what made
+/// "Bits"/"Brandon" read noticeably bigger than every other row in Quick
+/// Capture on iOS (Brandon: "fonts... are much larger"). Not visible on
+/// Mac — AppKit's Picker equivalent doesn't have this quirk. Building the
+/// label ourselves via `Menu` gives full control over font/color so it
+/// matches the surrounding Text exactly, on every platform.
+private struct MenuFieldPicker<Value: Hashable>: View {
+    let placeholder: String
+    let options: [(label: String, value: Value)]
+    let noneValue: Value
+    @Binding var selection: Value
+    let fontSize: CGFloat
+    let scheme: ColorScheme
+    var disabled: Bool = false
+
+    private var currentLabel: String {
+        options.first(where: { $0.value == selection })?.label ?? placeholder
+    }
+
+    var body: some View {
+        Menu {
+            Button(placeholder) { selection = noneValue }
+            ForEach(options, id: \.value) { opt in
+                Button(opt.label) { selection = opt.value }
+            }
+        } label: {
+            HStack {
+                Text(currentLabel)
+                    .font(.system(size: fontSize))
+                    .foregroundStyle(Theme.primary(scheme))
+                Spacer()
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: fontSize * 0.65, weight: .medium))
+                    .foregroundStyle(Theme.secondaryText(scheme))
+            }
+            .padding(12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
     }
 }

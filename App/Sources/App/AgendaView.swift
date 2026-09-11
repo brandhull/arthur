@@ -73,13 +73,18 @@ struct AgendaView: View {
 
                 // iPhone only — iPad gets its own non-floating quick-add
                 // button instead (top bar in portrait, sidebar top row in
-                // landscape — see iOSAgendaLayout). 32, not 24 — Brandon:
+                // landscape — see iOSAgendaLayout). 32 horizontal — Brandon:
                 // it was resting right on the ContentBox's own border
                 // lines back when content had borders; kept for visual
-                // continuity even though content is borderless now.
+                // continuity even though content is borderless now. Bottom
+                // is taller (100, not 32) specifically to clear Quick
+                // Capture's collapsed Destination card sitting right above
+                // it — at 32 the button's top edge overlapped the card's
+                // own expand/collapse chevron.
                 if horizontalSizeClass == .compact {
                     floatingAddButton
-                        .padding(32)
+                        .padding(.horizontal, 32)
+                        .padding(.bottom, 100)
                 }
             }
             #endif
