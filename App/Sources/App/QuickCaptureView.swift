@@ -43,7 +43,12 @@ struct QuickCaptureView: View {
     // screen, not the destination picker already expanded and eating into
     // that space. Not persisted beyond that — collapsing/expanding later in
     // the same session behaves as before, just a different starting point.
-    @State private var isDestinationExpanded = false
+    //
+    // Lifted from local @State to an external binding (owned by
+    // AgendaView, alongside selectedTab/quickCaptureSource) so the iPhone
+    // floating quick-add button can hide itself while this is expanded —
+    // AgendaView needs to observe it too, not just this view.
+    @Binding var isDestinationExpanded: Bool
 
     // MARK: Craft state
     // craftText/addSeparator used to be local @State here — now they live

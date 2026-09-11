@@ -42,6 +42,11 @@ struct AgendaView: View {
     // QuickCaptureView) so the sidebar's/drawer's nested Craft/Baserow rows
     // can drive it identically on every platform.
     @State private var quickCaptureSource: QuickCaptureSource = .craft
+    // Lifted out of QuickCaptureView (was purely local @State there) so the
+    // iPhone floating quick-add button can hide itself while the card's
+    // expanded — Brandon: the button sitting right where the expanded
+    // Destination card's own content now is looked wrong/cluttered.
+    @State private var isDestinationExpanded = false
 
     private var effectiveScheme: ColorScheme {
         switch store.config.appearance {
@@ -77,14 +82,26 @@ struct AgendaView: View {
                 // it was resting right on the ContentBox's own border
                 // lines back when content had borders; kept for visual
                 // continuity even though content is borderless now. Bottom
-                // is taller (100, not 32) specifically to clear Quick
+                // is taller (68, not 32) specifically to clear Quick
                 // Capture's collapsed Destination card sitting right above
-                // it — at 32 the button's top edge overlapped the card's
-                // own expand/collapse chevron.
+                // it, resting just slightly above it — at 32 the button
+                // overlapped the card's own expand/collapse chevron; 100
+                // (an earlier attempt) left it floating too high above the
+                // card instead.
                 if horizontalSizeClass == .compact {
                     floatingAddButton
                         .padding(.horizontal, 32)
-                        .padding(.bottom, 100)
+                        .padding(.bottom, 68)
+                        // Hidden while Quick Capture's Destination card is
+                        // expanded — Brandon: with the card's own picker/
+                        // Save content now taking up that space, the button
+                        // sitting right on top of it read as cluttered.
+                        // Only relevant on the Quick Capture tab with Craft
+                        // selected (Baserow's form and every other tab
+                        // don't have a Destination card at all).
+                        .opacity(isFloatingButtonHidden ? 0 : 1)
+                        .allowsHitTesting(!isFloatingButtonHidden)
+                        .animation(.easeInOut(duration: 0.15), value: isFloatingButtonHidden)
                 }
             }
             #endif
@@ -173,7 +190,7 @@ struct AgendaView: View {
                 .allowsHitTesting(selectedTab == .tasks)
             QuickCaptureView(
                 store: store, documentStore: documentStore, source: $quickCaptureSource,
-                isActive: selectedTab == .quickCapture
+                isActive: selectedTab == .quickCapture, isDestinationExpanded: $isDestinationExpanded
             )
                 .opacity(selectedTab == .quickCapture ? 1 : 0)
                 .allowsHitTesting(selectedTab == .quickCapture)
@@ -184,6 +201,10 @@ struct AgendaView: View {
     }
 
     #if os(iOS)
+    private var isFloatingButtonHidden: Bool {
+        selectedTab == .quickCapture && quickCaptureSource == .craft && isDestinationExpanded
+    }
+
     /// iPhone-only floating quick-add button (iPad uses a non-floating
     /// button instead — see iOSAgendaLayout). Same circle/shadow/position
     /// as the app's old "+" button; icon is now bubble.and.pencil and it
