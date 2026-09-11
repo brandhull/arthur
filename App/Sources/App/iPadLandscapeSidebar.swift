@@ -1,16 +1,16 @@
-#if os(macOS)
+#if os(iOS)
 import SwiftUI
 import ArthurKit
 
-/// Mac-only sidebar — Notion nav list (blue-dot active indicator) crossed
-/// with Maverick's collapsible/resizable chrome. Dumb/stateless beyond its
-/// own hover state: every real piece of state (selection, collapse,
-/// quick-add/settings presentation) is owned by MacAgendaLayout and passed
-/// in as bindings, so this view can't drift out of sync with the main pane.
-/// The actual nav rows live in SidebarNavList (shared with the iOS drawer
-/// and the iPad landscape sidebar) — this view owns just the top row
-/// (collapse toggle + quick-add) that's specific to Mac's chrome.
-struct SidebarView: View {
+/// iPad-in-landscape's persistent sidebar — Brandon's explicit ask: "the
+/// same visual layout as the Mac app, where the panel is collapsible and
+/// so forth." Mirrors Mac's SidebarView + MacAgendaLayout sidebar-card
+/// treatment exactly (floating rounded card, thin hairline border, a top
+/// row with a collapse toggle + bubble.and.pencil quick-add popover, then
+/// SidebarNavList below it) — just fixed-width and non-drag-resizable
+/// (plain HStack at the call site, not Mac's AppKit-backed
+/// ResizableHSplit, which doesn't compile on iOS anyway).
+struct iPadLandscapeSidebar: View {
     @ObservedObject var store: TaskStore
     @Binding var selectedTab: HomeTab
     @Binding var quickCaptureSource: QuickCaptureSource
@@ -44,18 +44,7 @@ struct SidebarView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                // .bottom — grows downward from the button, away from the
-                // window's top edge (this button sits right at the top of
-                // the sidebar, so any edge that grows upward or is
-                // vertically centered on it pushes part of the popover
-                // above the window). NSPopover positions relative to the
-                // screen, not the parent window, and does NOT clip itself
-                // to the window's bounds — confirmed live that it was
-                // genuinely rendering outside Arthur's own window, not just
-                // a screenshot artifact. QuickAddModal's width is capped
-                // (see its own comment) to also avoid overflowing left,
-                // since .bottom still centers horizontally.
-                .popover(isPresented: $showingQuickAdd, arrowEdge: .bottom) {
+                .popover(isPresented: $showingQuickAdd) {
                     QuickAddModal(
                         store: store, selectedTab: $selectedTab,
                         showingAddTask: $showingAddTask, isPresented: $showingQuickAdd
@@ -71,12 +60,16 @@ struct SidebarView: View {
                 showingSettings: $showingSettings, effectiveScheme: effectiveScheme
             )
         }
+        .frame(width: Theme.sidebarIdealWidth, alignment: .top)
         .frame(maxHeight: .infinity, alignment: .top)
-        // No own background here — MacAgendaLayout paints this view onto a
-        // rounded, distinctly-colored floating card from the outside
-        // (Theme.sidebarCardBackground), inset with a margin on 3 sides.
-        // Painting an opaque flat background here would sit on top of that
-        // and erase the rounded corners.
+        .background(
+            RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
+                .fill(Theme.sidebarCardBackground(effectiveScheme))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
+                .stroke(Theme.primary(effectiveScheme).opacity(Theme.borderOpacity), lineWidth: Theme.borderWidth)
+        )
         .foregroundStyle(Theme.primary(effectiveScheme))
     }
 }

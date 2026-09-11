@@ -9,11 +9,11 @@ enum QuickCaptureSource: String, CaseIterable, Identifiable, Hashable {
 
 /// Combines the two former standalone tabs — free-form text pushed to any
 /// Craft page, and a row pushed into any configured Baserow table — behind
-/// one Craft/Baserow toggle. On iOS/iPadOS that's still an in-view
-/// PillFilterBar, the same component (not just the same look) as the Tasks
-/// filter. On Mac (sidebar redesign) the toggle moved out to two nested
-/// sidebar rows under "Quick Capture" — `source` is an external binding so
-/// either owner can drive it identically.
+/// one Craft/Baserow selection. Selection is made in the sidebar/drawer's
+/// nested Craft/Baserow rows under "Quick Capture" on every platform now,
+/// not an in-view toggle — `source` is an external binding so whichever
+/// nav component owns it (Mac's SidebarView, the iOS drawer, iPad's
+/// landscape sidebar) can drive it identically.
 struct QuickCaptureView: View {
     @ObservedObject var store: TaskStore
     @ObservedObject var documentStore: DocumentStore
@@ -36,17 +36,14 @@ struct QuickCaptureView: View {
     // on iOS, just unused there.
     let isActive: Bool
 
-    #if os(macOS)
-    // Mac-only — collapsing the bottom-docked Destination card back to just
-    // its header, per Brandon's request for "a clean interface to type"
-    // similar to the old pop-out window's dedicated capture surface.
-    // Defaults collapsed: Brandon wants the app opening straight into a
-    // clean Quick Capture typing surface right after the splash screen,
-    // not the destination picker already expanded and eating into that
-    // space. Not persisted beyond that — collapsing/expanding later in the
-    // same session behaves as before, just a different starting point.
+    // Collapsing the bottom-docked Destination card back to just its
+    // header, per Brandon's request for "a clean interface to type" on
+    // every platform. Defaults collapsed: the app should open straight
+    // into a clean Quick Capture typing surface right after the splash
+    // screen, not the destination picker already expanded and eating into
+    // that space. Not persisted beyond that — collapsing/expanding later in
+    // the same session behaves as before, just a different starting point.
     @State private var isDestinationExpanded = false
-    #endif
 
     // MARK: Craft state
     // craftText/addSeparator used to be local @State here — now they live
@@ -98,26 +95,8 @@ struct QuickCaptureView: View {
         #endif
     }
 
-    /// Matches Tasks' own filterFontSize exactly — same reasoning (Mac
-    /// flagged as too small at the smaller size, iOS/iPadOS weren't).
-    private var filterFontSize: CGFloat {
-        #if os(macOS)
-        return 14
-        #else
-        return 13
-        #endif
-    }
-
     private var baserowClient: BaserowClient {
         BaserowClient(token: store.config.baserowToken)
-    }
-
-    var body: some View {
-        #if os(macOS)
-        macBody
-        #else
-        iosBody
-        #endif
     }
 
     private func handleOnAppear() {
@@ -128,47 +107,30 @@ struct QuickCaptureView: View {
         }
     }
 
-    #if os(iOS)
-    private var iosBody: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 10) {
-                    PillFilterBar(
-                        items: QuickCaptureSource.allCases, label: { $0.rawValue },
-                        selection: $source, scheme: effectiveScheme, fontSize: filterFontSize
-                    )
-                    Spacer()
-                }
-                .padding(.horizontal, 20)
-                .frame(height: Theme.headerRowHeight)
-                .foregroundStyle(Theme.primary(effectiveScheme))
-
-                if source == .craft {
-                    craftCaptureBox
-                    craftDestinationSection
-                } else {
-                    baserowSection
-                }
-            }
-            .padding(.bottom, 16)
-        }
-        .foregroundStyle(Theme.primary(effectiveScheme))
-        .onAppear(perform: handleOnAppear)
+    /// Mac's sidebar sits right beside this card, so 8pt (Theme's shared
+    /// sidebar-card inset) reads as plenty of margin next to it. iPhone/
+    /// iPad have no sidebar there — the same 8pt left the card nearly flush
+    /// with the screen edges, which Brandon flagged as "bumping right up
+    /// against the sides."
+    private var destinationCardHorizontalInset: CGFloat {
+        #if os(macOS)
+        return Theme.sidebarCardInset
+        #else
+        return 16
+        #endif
     }
-    #endif
 
-    #if os(macOS)
-    /// Craft/Baserow is picked in the sidebar now (nested rows under Quick
-    /// Capture), not an in-view pill. The capture box fills the main pane,
-    /// unbordered (Brandon: content should flow with just padding, not sit
-    /// in a box — same principle as Rocks/Tasks/Reflection's ContentBox on
-    /// Mac), and the destination picker/Add Separator/Save sit in a
-    /// bottom-docked floating card — same inset/rounded/thin-bordered
-    /// treatment as the sidebar (Theme.sidebarCardBackground), rather than
-    /// a flat divider+tint panel. Baserow has no equivalent free-text
-    /// main-pane content, so its whole form (Database → Table → fields →
-    /// Push) just fills the main pane directly, per Brandon's explicit call.
-    private var macBody: some View {
+    /// Craft/Baserow is picked in the sidebar/drawer now (nested rows under
+    /// Quick Capture), not an in-view pill, on every platform. The capture
+    /// box fills the main pane, unbordered (Brandon: content should flow
+    /// with just padding, not sit in a box — same principle as Rocks/Tasks/
+    /// Reflection's ContentBox), and the destination picker/Add Separator/
+    /// Save sit in a bottom-docked floating card — same inset/rounded/thin-
+    /// bordered treatment as the sidebar (Theme.sidebarCardBackground).
+    /// Baserow has no equivalent free-text main-pane content, so its whole
+    /// form (Database → Table → fields → Push) just fills the main pane
+    /// directly, per Brandon's explicit call — on every platform.
+    var body: some View {
         VStack(spacing: 0) {
             if source == .craft {
                 // No outer ScrollView here — PlainTextEditor's NSTextView is
@@ -203,7 +165,7 @@ struct QuickCaptureView: View {
                     RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
                         .stroke(Theme.primary(effectiveScheme).opacity(Theme.borderOpacity), lineWidth: Theme.borderWidth)
                 )
-                .padding(.horizontal, Theme.sidebarCardInset)
+                .padding(.horizontal, destinationCardHorizontalInset)
                 .padding(.bottom, Theme.sidebarCardInset)
                 .frame(maxHeight: isDestinationExpanded ? 280 : nil)
             } else {
@@ -247,25 +209,14 @@ struct QuickCaptureView: View {
         .padding(.top, 14)
         .padding(.bottom, isDestinationExpanded ? 0 : 14)
     }
-    #endif
 
     // MARK: - Craft section (formerly CaptureSheet)
 
-    // Mac: no border — content flows with just padding, same principle as
-    // Rocks/Tasks/Reflection's ContentBox on Mac (see those views' identical
-    // `contentBordered` comment). iOS/iPadOS keep FieldBox's border,
-    // unchanged.
-    private var captureBoxBordered: Bool {
-        #if os(macOS)
-        return false
-        #else
-        return true
-        #endif
-    }
-
     @ViewBuilder
     private var craftCaptureBox: some View {
-        FieldBox(scheme: effectiveScheme, bordered: captureBoxBordered) {
+        // No border — content flows with just padding, same principle as
+        // Rocks/Tasks/Reflection's ContentBox, on every platform now.
+        FieldBox(scheme: effectiveScheme, bordered: false) {
             ZStack(alignment: .topLeading) {
                 if draft.text.isEmpty {
                     // Was a markdown-syntax cheat sheet (# Heading/**Strong**/
@@ -284,28 +235,20 @@ struct QuickCaptureView: View {
                 // instant Quick Capture becomes the selected sidebar item,
                 // no click needed, since the sidebar's collapsible now (no
                 // more separate pop-out window to expand into instead).
+                // Mac-only — not requested for iOS, and auto-popping the
+                // keyboard on every screen switch could be unwelcome mobile
+                // UX Brandon didn't ask for.
                 PlainTextEditor(
                     text: $draft.text, fontSize: inputFontSize, scheme: effectiveScheme, autoFocusWhen: isActive
                 )
                 .frame(minHeight: 120, maxHeight: .infinity)
                 #else
                 PlainTextEditor(text: $draft.text, fontSize: inputFontSize, scheme: effectiveScheme)
-                    .frame(minHeight: 120)
+                    .frame(minHeight: 120, maxHeight: .infinity)
                 #endif
             }
         }
         .padding(.top, 16)
-    }
-
-    // iOS keeps the label baked into the section, exactly as before. Mac's
-    // macBody renders its own header (title + collapse chevron) instead and
-    // calls `destinationFields` directly — see that computed property.
-    @ViewBuilder
-    private var craftDestinationSection: some View {
-        // Bumped from 4 — Brandon: it read as too close to the Capture box
-        // above it.
-        FieldLabel(title: "Destination", topPadding: 10)
-        destinationFields
     }
 
     @ViewBuilder

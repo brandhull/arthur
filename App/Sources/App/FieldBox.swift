@@ -8,11 +8,10 @@ struct FieldBox<Content: View>: View {
     // Explicit, not @Environment(\.colorScheme) — see ContentBox's identical
     // comment.
     let scheme: ColorScheme
-    // Mac's sidebar redesign wants Quick Capture's capture box to flow
-    // without a border (see ContentBox's identical `bordered` param and
-    // QuickCaptureView's `captureBoxBordered`) — every other FieldBox call
-    // site (actual form fields: Add Task, Baserow, the destination picker)
-    // keeps the default border.
+    // Quick Capture's capture box flows without a border on every platform
+    // now (see ContentBox's identical `bordered` param) — every other
+    // FieldBox call site (actual form fields: Add Task, Baserow, the
+    // destination picker) keeps the default border.
     var bordered: Bool = true
     @ViewBuilder let content: () -> Content
 

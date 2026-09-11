@@ -32,16 +32,9 @@ struct ReflectionView: View {
         #endif
     }
 
-    // See RocksView's identical comment — Mac's sidebar redesign wants
-    // display content flowing without a border, reserving borders for
-    // actual forms (Baserow's Database/Table pickers).
-    private var contentBordered: Bool {
-        #if os(macOS)
-        return false
-        #else
-        return true
-        #endif
-    }
+    // See RocksView's identical comment — display content flows without a
+    // border on every platform now, borders reserved for actual forms
+    // (Baserow's Database/Table pickers).
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -75,7 +68,7 @@ struct ReflectionView: View {
             // Top padding matches Quick Capture's own FieldBox/FieldLabel
             // spacing below its header row — see RocksView's identical
             // comment for the full reasoning.
-            ContentBox(scheme: effectiveScheme, bordered: contentBordered) {
+            ContentBox(scheme: effectiveScheme, bordered: false) {
                 if isEditing {
                     PlainTextEditor(text: $draftContent, fontSize: inputFontSize, scheme: effectiveScheme)
                 } else {

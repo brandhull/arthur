@@ -1,16 +1,19 @@
-#if os(macOS)
 import SwiftUI
 import ArthurKit
 
-/// The bubble.and.pencil quick-add popover from the sidebar's top-right —
-/// replaces the old floating "+" button on Mac (still present, unchanged,
-/// on iOS). Three options: New Task (opens AddTaskSheet unchanged), Quick
-/// Capture (just switches the sidebar selection), and New Reflection, which
-/// — per Brandon's explicit call — doesn't navigate anywhere: the modal
-/// transitions in place to a small inline compose box that appends straight
-/// to today's daily note, reusing DailyNoteComposeBox (the same view
-/// AddNoteSheet uses) rather than a second copy of that placeholder/
-/// PlainTextEditor logic.
+/// The bubble.and.pencil quick-add popover/sheet. Three options: New Task
+/// (opens AddTaskSheet unchanged), Quick Capture (just switches the
+/// selected tab), and New Reflection, which — per Brandon's explicit call —
+/// doesn't navigate anywhere: the modal transitions in place to a small
+/// inline compose box that appends straight to today's daily note, reusing
+/// DailyNoteComposeBox (the same view AddNoteSheet uses) rather than a
+/// second copy of that placeholder/PlainTextEditor logic.
+///
+/// Platform-neutral — nothing in here is actually Mac-specific. Presented
+/// via `.popover` on every platform: a real anchored popover on Mac/iPad,
+/// auto-adapted into a bottom sheet by SwiftUI on compact-width iPhone with
+/// no extra code, which happens to be exactly the right presentation for
+/// the inline New Reflection compose box on a phone screen.
 struct QuickAddModal: View {
     @ObservedObject var store: TaskStore
     @Binding var selectedTab: HomeTab
@@ -115,4 +118,3 @@ struct QuickAddModal: View {
         .padding(.vertical, 14)
     }
 }
-#endif

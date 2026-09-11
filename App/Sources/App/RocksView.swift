@@ -35,19 +35,13 @@ struct RocksView: View {
         #endif
     }
 
-    // Mac's sidebar redesign widened the main content pane specifically to
-    // let read-only display content (this, Tasks, Reflection) flow edge-
-    // to-edge with just padding instead of sitting in a bordered box —
-    // Brandon: borders should only appear around actual forms (Baserow's
-    // Database/Table pickers), not display content. iOS/iPadOS keep the
-    // border, unaffected — not part of this request.
-    private var contentBordered: Bool {
-        #if os(macOS)
-        return false
-        #else
-        return true
-        #endif
-    }
+    // The Mac sidebar redesign widened the main content pane specifically
+    // to let read-only display content (this, Tasks, Reflection) flow
+    // edge-to-edge with just padding instead of sitting in a bordered box
+    // — Brandon: borders should only appear around actual forms (Baserow's
+    // Database/Table pickers), not display content. The iPhone/iPad
+    // redesign brought the same rule to those platforms too, so this is no
+    // longer platform-conditional.
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -83,7 +77,7 @@ struct RocksView: View {
             // one; Tasks/Rocks/Reflection's ContentBox previously sat flush
             // against the header row with no gap, which read as
             // inconsistent once compared side by side.
-            ContentBox(scheme: effectiveScheme, bordered: contentBordered) {
+            ContentBox(scheme: effectiveScheme, bordered: false) {
                 if isEditing {
                     PlainTextEditor(text: $draftContent, fontSize: inputFontSize, scheme: effectiveScheme)
                 } else {

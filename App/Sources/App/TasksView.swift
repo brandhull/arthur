@@ -35,16 +35,9 @@ struct TasksView: View {
         #endif
     }
 
-    // See RocksView's identical comment — Mac's sidebar redesign wants
-    // display content flowing without a border, reserving borders for
-    // actual forms (Baserow's Database/Table pickers).
-    private var contentBordered: Bool {
-        #if os(macOS)
-        return false
-        #else
-        return true
-        #endif
-    }
+    // See RocksView's identical comment — display content flows without a
+    // border on every platform now, borders reserved for actual forms
+    // (Baserow's Database/Table pickers).
 
     var body: some View {
         VStack(spacing: 0) {
@@ -53,6 +46,12 @@ struct TasksView: View {
             // is gone too — the floating "+" button covers that now, so
             // this row is just the filter pills.
             HStack(spacing: 10) {
+                // Centered on iOS/iPadOS (Brandon's ask) — Mac keeps it
+                // leading-aligned, matching Rocks/Reflection's Edit button
+                // sitting in the same spot on that platform.
+                #if os(iOS)
+                Spacer()
+                #endif
                 PillFilterBar(
                     items: TaskFilter.allCases, label: \.rawValue,
                     selection: $store.filter, scheme: effectiveScheme, fontSize: filterFontSize
@@ -66,7 +65,7 @@ struct TasksView: View {
             // Top padding matches Quick Capture's own FieldBox/FieldLabel
             // spacing below its header row — see RocksView's comment for
             // the full reasoning; same fix applied identically here.
-            ContentBox(scheme: effectiveScheme, bordered: contentBordered) {
+            ContentBox(scheme: effectiveScheme, bordered: false) {
                 if store.filteredTasks.isEmpty {
                     // System font, not Noto Serif — Brandon's request; this is
                     // a placeholder state, not real content.
