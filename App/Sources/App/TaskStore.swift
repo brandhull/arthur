@@ -70,6 +70,30 @@ final class TaskStore: ObservableObject {
     func refreshIfStale(maxAge: TimeInterval = 90) async {
         if let lastActiveRefresh, Date().timeIntervalSince(lastActiveRefresh) < maxAge { return }
         lastActiveRefresh = Date()
+        await refreshWithTimeoutRetry()
+    }
+
+    /// Resuming from the lock screen or another app sometimes lands right in
+    /// a brief window where the network path isn't back up yet (cellular/
+    /// Wi-Fi still reassociating) — the very first request fired at that
+    /// exact instant can fail with a timeout even though the same request a
+    /// couple seconds later succeeds fine. Brandon saw this as an
+    /// intermittent "Something went wrong / The request timed out" alert
+    /// specifically right after unlocking or switching back to Arthur on
+    /// iPhone. One silent retry after a short delay absorbs that race
+    /// instead of surfacing a scary alert for what's really a non-issue a
+    /// couple seconds later — a second real failure (or any non-timeout
+    /// error) still surfaces normally. Scoped to this auto-triggered resume
+    /// path only, not forceSync/pull-to-refresh, which should keep failing
+    /// loudly and immediately since those are explicit user actions.
+    private func refreshWithTimeoutRetry() async {
+        errorMessage = nil
+        await refresh()
+        await loadDailyNote()
+        await loadRocks()
+        guard let message = errorMessage, message.localizedCaseInsensitiveContains("timed out") else { return }
+        errorMessage = nil
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
         await refresh()
         await loadDailyNote()
         await loadRocks()
