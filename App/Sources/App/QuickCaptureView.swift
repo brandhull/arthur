@@ -39,11 +39,13 @@ struct QuickCaptureView: View {
     #if os(macOS)
     // Mac-only — collapsing the bottom-docked Destination card back to just
     // its header, per Brandon's request for "a clean interface to type"
-    // similar to the old pop-out window's dedicated capture surface. Not
-    // persisted — each Quick Capture visit starts expanded, since the
-    // common case is picking a destination and saving, not leaving it
-    // collapsed indefinitely.
-    @State private var isDestinationExpanded = true
+    // similar to the old pop-out window's dedicated capture surface.
+    // Defaults collapsed: Brandon wants the app opening straight into a
+    // clean Quick Capture typing surface right after the splash screen,
+    // not the destination picker already expanded and eating into that
+    // space. Not persisted beyond that — collapsing/expanding later in the
+    // same session behaves as before, just a different starting point.
+    @State private var isDestinationExpanded = false
     #endif
 
     // MARK: Craft state

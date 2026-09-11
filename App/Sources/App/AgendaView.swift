@@ -29,7 +29,11 @@ struct AgendaView: View {
     @State private var showingSettings = false
     @State private var showingAddTask = false
     @State private var showingAddNote = false
-    @State private var selectedTab: HomeTab = .rocks
+    // Opens straight to Quick Capture, not Rocks — Brandon: Quick Capture
+    // (with Craft, its own default source) is "90% of what I use Arthur
+    // for," so that's what should be waiting right after the splash screen
+    // rather than an extra tap away.
+    @State private var selectedTab: HomeTab = .quickCapture
     // Owns Quick Capture's Craft/Baserow selection here (not internal to
     // QuickCaptureView) so the Mac sidebar's nested Craft/Baserow rows and
     // iOS's in-view PillFilterBar toggle can both drive the exact same
