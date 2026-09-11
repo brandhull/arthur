@@ -169,11 +169,19 @@ struct QuickCaptureView: View {
     private var macBody: some View {
         VStack(spacing: 0) {
             if source == .craft {
-                ScrollView {
-                    craftCaptureBox
-                        .padding(.bottom, 16)
-                }
-                .frame(maxHeight: .infinity)
+                // No outer ScrollView here — PlainTextEditor's NSTextView is
+                // already wrapped in its own NSScrollView (see
+                // PlainTextEditor.swift), so nesting a second SwiftUI
+                // ScrollView around it just capped the whole box to its
+                // content's intrinsic height instead of letting it fill the
+                // pane, leaving a large dead gap above the Destination
+                // card. Letting craftCaptureBox stretch directly via
+                // maxHeight: .infinity is what actually fills that space —
+                // the inner NSScrollView still handles scrolling once
+                // typed content exceeds the available height.
+                craftCaptureBox
+                    .padding(.bottom, 16)
+                    .frame(maxHeight: .infinity)
 
                 VStack(alignment: .leading, spacing: 0) {
                     destinationHeader
@@ -277,7 +285,7 @@ struct QuickCaptureView: View {
                 PlainTextEditor(
                     text: $draft.text, fontSize: inputFontSize, scheme: effectiveScheme, autoFocusWhen: isActive
                 )
-                .frame(minHeight: 120)
+                .frame(minHeight: 120, maxHeight: .infinity)
                 #else
                 PlainTextEditor(text: $draft.text, fontSize: inputFontSize, scheme: effectiveScheme)
                     .frame(minHeight: 120)
