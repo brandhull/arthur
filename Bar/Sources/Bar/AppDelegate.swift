@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var addTaskPanel: NSPanel?
     private var quickCaptureHotKey: HotKey?
     private var quickCapturePanel: NSPanel?
+    private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -32,19 +33,65 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusItem.menu = buildMenu()
 
-        // ⌥⌘A by default — distinct from craft-quick-capture's ⌥⌘Space so both
-        // menu bar apps can run side by side without a shortcut collision.
-        addTaskHotKey = HotKey(keyCode: 0, modifiers: UInt32(cmdKey | optionKey)) { [weak self] in
-            self?.toggleAddTaskPanel()
+        // Loaded from disk (BarHotKeys), not hardcoded — reintroduced after
+        // being fixed at ⌥⌘A/⌥⌘C with no way to change them. Distinct
+        // defaults from craft-quick-capture's ⌥⌘Space so both menu bar apps
+        // can run side by side without a shortcut collision; each hotkey
+        // still gets its own separate popup rather than folding into one
+        // with a mode switch — Brandon uses both regularly, each focused on
+        // one job.
+        let saved = BarHotKeys.load()
+        if !applyAddTaskHotKey(saved.addTask, persist: false) {
+            NSLog("ArthurBar: failed to register \(saved.addTask.display) for Quick Task (another app may own it)")
         }
-        // ⌥⌘C ("Capture") — a second, separate hotkey/popup rather than
-        // folding this into Quick Add with a mode switch: Brandon still
-        // uses task quick-add regularly, so each stays focused on one job.
-        // keyCode 8 = 'C'. Also distinct from craft-quick-capture's
-        // ⌥⌘Space, same reasoning as above.
-        quickCaptureHotKey = HotKey(keyCode: 8, modifiers: UInt32(cmdKey | optionKey)) { [weak self] in
-            self?.toggleQuickCapturePanel()
+        if !applyQuickCaptureHotKey(saved.quickCapture, persist: false) {
+            NSLog("ArthurBar: failed to register \(saved.quickCapture.display) for Quick Capture (another app may own it)")
         }
+    }
+
+    /// Registers `spec` as Quick Task's global hotkey; on success persists
+    /// it (unless `persist` is false, used at launch when re-applying what's
+    /// already saved) and refreshes the menu's displayed shortcut. Keeps the
+    /// old hotkey if registration fails, so a "someone else owns this combo"
+    /// failure doesn't leave the panel with no hotkey at all.
+    @discardableResult
+    private func applyAddTaskHotKey(_ spec: HotKeySpec, persist: Bool = true) -> Bool {
+        let old = addTaskHotKey
+        addTaskHotKey = nil
+        guard let new = HotKey(keyCode: spec.keyCode, modifiers: spec.modifiers,
+                               callback: { [weak self] in self?.toggleAddTaskPanel() })
+        else {
+            addTaskHotKey = old
+            return false
+        }
+        addTaskHotKey = new
+        if persist {
+            var keys = BarHotKeys.load()
+            keys.addTask = spec
+            keys.save()
+        }
+        statusItem.menu = buildMenu()
+        return true
+    }
+
+    @discardableResult
+    private func applyQuickCaptureHotKey(_ spec: HotKeySpec, persist: Bool = true) -> Bool {
+        let old = quickCaptureHotKey
+        quickCaptureHotKey = nil
+        guard let new = HotKey(keyCode: spec.keyCode, modifiers: spec.modifiers,
+                               callback: { [weak self] in self?.toggleQuickCapturePanel() })
+        else {
+            quickCaptureHotKey = old
+            return false
+        }
+        quickCaptureHotKey = new
+        if persist {
+            var keys = BarHotKeys.load()
+            keys.quickCapture = spec
+            keys.save()
+        }
+        statusItem.menu = buildMenu()
+        return true
     }
 
     private func toggleAddTaskPanel() {
@@ -74,9 +121,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             p.level = .floating
             addTaskPanel = p
         }
+        if let addTaskPanel { centerOnMainScreen(addTaskPanel) }
         NSApp.activate(ignoringOtherApps: true)
-        addTaskPanel?.center()
         addTaskPanel?.makeKeyAndOrderFront(nil)
+    }
+
+    /// `NSWindow.center()` deliberately biases the window slightly *above*
+    /// true vertical center (Apple's classic "visually balanced" placement)
+    /// — Brandon flagged both panels as sitting noticeably higher than he
+    /// wanted. This computes the actual screen-center origin instead.
+    /// `layoutIfNeeded()` first forces the panel to adopt its real size
+    /// (via NSHostingController's sizingOptions) before reading `frame.size`,
+    /// so a panel that hasn't been shown yet still centers correctly rather
+    /// than off whatever stale/default size it started with.
+    private func centerOnMainScreen(_ panel: NSPanel) {
+        panel.layoutIfNeeded()
+        guard let screen = NSScreen.main else {
+            panel.center()
+            return
+        }
+        let screenFrame = screen.visibleFrame
+        let size = panel.frame.size
+        let x = screenFrame.midX - size.width / 2
+        let y = screenFrame.midY - size.height / 2
+        panel.setFrameOrigin(NSPoint(x: x, y: y))
     }
 
     private func toggleQuickCapturePanel() {
@@ -91,29 +159,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if quickCapturePanel == nil {
             let view = QuickCaptureBarView(onSubmit: { [weak self] in self?.quickCapturePanel?.orderOut(nil) })
             let hosting = NSHostingController(rootView: view)
+            // Same reasoning as showAddTaskPanel's hosting.sizingOptions —
+            // QuickCaptureBarView's own .fixedSize(...) now reports a real,
+            // variable height (the Destination section collapses/expands),
+            // so the panel needs to track that instead of a size fixed at
+            // creation time.
+            hosting.sizingOptions = [.preferredContentSize]
             let p = NSPanel(contentViewController: hosting)
             p.styleMask = [.titled, .closable, .nonactivatingPanel]
             p.title = "Quick Capture"
             p.isFloatingPanel = true
             p.level = .floating
-            p.setContentSize(NSSize(width: 380, height: 340))
             quickCapturePanel = p
         }
+        if let quickCapturePanel { centerOnMainScreen(quickCapturePanel) }
         NSApp.activate(ignoringOtherApps: true)
-        quickCapturePanel?.center()
         quickCapturePanel?.makeKeyAndOrderFront(nil)
     }
 
     private func buildMenu() -> NSMenu {
         let menu = NSMenu()
-        let add = NSMenuItem(title: "Quick Task…", action: #selector(openAddTaskPanel), keyEquivalent: "a")
-        add.keyEquivalentModifierMask = [.command, .option]
+        let keys = BarHotKeys.load()
+
+        let add = NSMenuItem(title: "Quick Task…", action: #selector(openAddTaskPanel), keyEquivalent: keys.addTask.keyChar)
+        add.keyEquivalentModifierMask = keys.addTask.cocoaModifiers
         add.target = self
         menu.addItem(add)
-        let capture = NSMenuItem(title: "Quick Capture…", action: #selector(openQuickCapturePanel), keyEquivalent: "c")
-        capture.keyEquivalentModifierMask = [.command, .option]
+
+        let capture = NSMenuItem(title: "Quick Capture…", action: #selector(openQuickCapturePanel), keyEquivalent: keys.quickCapture.keyChar)
+        capture.keyEquivalentModifierMask = keys.quickCapture.cocoaModifiers
         capture.target = self
         menu.addItem(capture)
+
+        menu.addItem(.separator())
+        let hotkeys = NSMenuItem(title: "Hotkeys…", action: #selector(openSettings), keyEquivalent: "")
+        hotkeys.target = self
+        menu.addItem(hotkeys)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Arthur Bar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         return menu
@@ -121,4 +202,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openAddTaskPanel() { showAddTaskPanel() }
     @objc private func openQuickCapturePanel() { showQuickCapturePanel() }
+
+    @objc private func openSettings() {
+        if settingsWindow == nil {
+            let view = BarSettingsView(hotKeys: BarHotKeys.load()) { [weak self] row, spec in
+                guard let self else { return false }
+                switch row {
+                case .addTask: return self.applyAddTaskHotKey(spec)
+                case .quickCapture: return self.applyQuickCaptureHotKey(spec)
+                }
+            }
+            let window = NSWindow(contentViewController: NSHostingController(rootView: view))
+            window.styleMask = [.titled, .closable]
+            window.title = "ArthurBar Hotkeys"
+            window.isReleasedWhenClosed = false
+            window.center()
+            settingsWindow = window
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow?.makeKeyAndOrderFront(nil)
+    }
 }

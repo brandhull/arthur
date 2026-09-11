@@ -65,6 +65,8 @@ struct QuickAddView: View {
         // when it's hidden, rather than clipping into a fixed size.
         .fixedSize(horizontal: false, vertical: true)
         .frame(width: 340)
+        // Always dark — Brandon's explicit ask, no setting to change it.
+        .preferredColorScheme(.dark)
         .onAppear { config = Config.load() }
     }
 

@@ -9,6 +9,11 @@ import ArthurKit
 /// ArthurKit's DocumentStore with the main app, so its recents/cache are the
 /// exact same file on disk — using this popup keeps the main app's Quick
 /// Capture suggestions in sync, and vice versa.
+///
+/// Destination starts collapsed (same as the main app's Quick Capture card)
+/// so the text editor gets the bulk of the panel's height — "more room to
+/// type," per Brandon's ask — and only the 3 most-recently-used matches show
+/// once it's expanded, rather than every match at once.
 struct QuickCaptureBarView: View {
     let onSubmit: () -> Void
 
@@ -20,71 +25,40 @@ struct QuickCaptureBarView: View {
     @State private var subPages: [CraftClient.CraftBlock] = []
     @State private var subPagesParentId: String?
     @State private var isLoadingSubPages = false
+    @State private var isDestinationExpanded = false
     @State private var addSeparator = true
     @State private var isSubmitting = false
     @State private var errorMessage: String?
 
-    private var results: [CraftDocument] { documentStore.search(query) }
+    // limit: 3, not the default 8 — Brandon: too many matches/recents
+    // showing at once in this small panel; caps both the empty-query
+    // recents list and typed-search results the same way.
+    private var results: [CraftDocument] { documentStore.search(query, limit: 3) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Quick Capture").font(.headline)
 
-            TextEditor(text: $text)
-                .font(.system(size: 13))
-                .frame(minHeight: 80, maxHeight: 140)
+            BarTextEditor(text: $text, font: .systemFont(ofSize: 13))
+                // Uniform 6pt inset on every side — without it the cursor/
+                // text sat flush against the box's edges with no breathing
+                // room (Brandon: "cursor was oddly placed"), since a plain
+                // TextEditor has no built-in content inset of its own to
+                // separate it from the border drawn right at its bounds.
+                .padding(6)
+                .frame(minHeight: 160, maxHeight: 220)
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator))
 
-            if let selectedDoc {
-                HStack {
-                    Text(selectedDoc.title).font(.subheadline)
-                    Spacer()
-                    Button("Change") {
-                        self.selectedDoc = nil
-                        subPages = []
-                    }
-                    .font(.caption)
-                }
-                if isLoadingSubPages {
-                    ProgressView().controlSize(.small)
-                } else if !subPages.isEmpty && selectedDoc.id == subPagesParentId {
-                    ForEach(subPages, id: \.id) { sub in
-                        Button {
-                            self.selectedDoc = CraftDocument(id: sub.id, title: sub.markdown)
-                            subPages = []
-                        } label: {
-                            Text(sub.markdown)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            } else {
-                TextField("Search documents…", text: $query)
-                    .textFieldStyle(.roundedBorder)
-                if !results.isEmpty {
-                    ForEach(results) { doc in
-                        Button {
-                            selectedDoc = doc
-                            Task { await loadSubPages(of: doc) }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(doc.title).font(.subheadline)
-                                if let folder = doc.folder {
-                                    Text(folder).font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+            destinationHeader
+            if isDestinationExpanded {
+                destinationFields
             }
 
-            Toggle("Add Separator", isOn: $addSeparator)
-                .toggleStyle(.checkbox)
+            HStack {
+                Spacer()
+                Toggle("Add Separator", isOn: $addSeparator)
+                    .toggleStyle(.checkbox)
+            }
 
             if let errorMessage {
                 Text(errorMessage).font(.caption).foregroundStyle(.red)
@@ -99,10 +73,88 @@ struct QuickCaptureBarView: View {
             }
         }
         .padding()
+        // Reports this view's actual (variable) height to the hosting
+        // NSPanel — see AppDelegate's showQuickCapturePanel — so the panel
+        // grows/shrinks as Destination expands/collapses instead of staying
+        // pinned to one fixed size.
+        .fixedSize(horizontal: false, vertical: true)
         .frame(width: 340)
+        // Always dark — Brandon's explicit ask, no setting to change it.
+        // ArthurBar never had an appearance toggle of its own; this
+        // overrides whatever the system/main-app appearance happens to be.
+        .preferredColorScheme(.dark)
         .onAppear {
             config = Config.load()
             documentStore.refreshIfStale(craftLink: config.craftLink)
+        }
+    }
+
+    /// "Destination" title + collapse/expand chevron — same disclosure
+    /// affordance as the main app's Quick Capture card.
+    private var destinationHeader: some View {
+        Button {
+            isDestinationExpanded.toggle()
+        } label: {
+            HStack {
+                Text("Destination").font(.subheadline)
+                Spacer()
+                Image(systemName: isDestinationExpanded ? "chevron.down" : "chevron.up")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var destinationFields: some View {
+        if let selectedDoc {
+            HStack {
+                Text(selectedDoc.title).font(.subheadline)
+                Spacer()
+                Button("Change") {
+                    self.selectedDoc = nil
+                    subPages = []
+                }
+                .font(.caption)
+            }
+            if isLoadingSubPages {
+                ProgressView().controlSize(.small)
+            } else if !subPages.isEmpty && selectedDoc.id == subPagesParentId {
+                ForEach(subPages, id: \.id) { sub in
+                    Button {
+                        self.selectedDoc = CraftDocument(id: sub.id, title: sub.markdown)
+                        subPages = []
+                    } label: {
+                        Text(sub.markdown)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        } else {
+            TextField("Search documents…", text: $query)
+                .textFieldStyle(.roundedBorder)
+            if !results.isEmpty {
+                ForEach(results) { doc in
+                    Button {
+                        selectedDoc = doc
+                        Task { await loadSubPages(of: doc) }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(doc.title).font(.subheadline)
+                            if let folder = doc.folder {
+                                Text(folder).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
 
