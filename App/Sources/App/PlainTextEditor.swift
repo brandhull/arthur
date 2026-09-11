@@ -38,6 +38,12 @@ import SwiftUI
 /// "leading 7 instead of 12" compensation hack scattered across the app —
 /// that offset (for TextEditor's own built-in lineFragmentPadding) is
 /// zeroed out directly in both platforms' wrapped text views instead.
+///
+/// Also the fix for text visually disappearing mid-typing on iPad (Brandon:
+/// several words into a Quick Capture, already-typed text would vanish —
+/// cursor still visible/advancing, still able to type, but no glyphs) — see
+/// the markedTextRange guard in UITextViewBridge.updateUIView for the root
+/// cause and fix.
 struct PlainTextEditor: View {
     @Binding var text: String
     let fontSize: CGFloat
@@ -95,6 +101,22 @@ private struct UITextViewBridge: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: UITextView, context: Context) {
+        // Brandon: on iPad specifically, several words into typing in Quick
+        // Capture, already-typed text would visually vanish — cursor still
+        // visible and advancing, still able to keep typing, but the glyphs
+        // themselves gone. Root cause: overwriting `.text` while iOS has an
+        // active "marked text" session (the underlined candidate from
+        // autocorrect/predictive typing) corrupts the text view's visual
+        // layer without breaking the underlying input session — a
+        // documented UIKit hazard, and far more likely on iPad because its
+        // predictive-text bar suggests (and marks) far more aggressively
+        // than iPhone's. `updateUIView` fires on effectively every SwiftUI
+        // re-render, so `uiView.text = text` was firing mid-composition
+        // constantly. Skipping the whole sync while marked text is pending
+        // is the standard fix — the delegate callback below still keeps
+        // `text` current once the candidate is committed/dismissed and
+        // markedTextRange clears, so nothing is lost, just deferred.
+        guard uiView.markedTextRange == nil else { return }
         if uiView.text != text { uiView.text = text }
         if uiView.font != font { uiView.font = font }
         if uiView.textColor != textColor { uiView.textColor = textColor }
@@ -161,6 +183,12 @@ private struct NSTextViewBridge: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         guard let textView = nsView.documentView as? NSTextView else { return }
+        // Same class of bug as UITextViewBridge's identical guard (see its
+        // comment) — overwriting .string while AppKit has an active marked-
+        // text session (IME composition, e.g. CJK input) is the AppKit
+        // equivalent hazard. Less likely to trigger via plain autocorrect
+        // on Mac, but cheap to guard against for the same reason.
+        guard !textView.hasMarkedText() else { return }
         if textView.string != text { textView.string = text }
         if textView.font != font { textView.font = font }
         if textView.textColor != textColor { textView.textColor = textColor }
