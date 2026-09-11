@@ -35,6 +35,13 @@ struct SidebarView: View {
 
                 Spacer()
 
+                // Presentation lives at AgendaView's top level now
+                // (CenteredModal, mounted once, shared by every platform) —
+                // this button just flips the shared showingQuickAdd flag
+                // instead of anchoring its own popover, which used to
+                // render outside the window entirely at certain sidebar
+                // widths (NSPopover positions relative to the screen, not
+                // the parent window, and doesn't clip to its bounds).
                 Button {
                     showingQuickAdd = true
                 } label: {
@@ -44,23 +51,6 @@ struct SidebarView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                // .bottom — grows downward from the button, away from the
-                // window's top edge (this button sits right at the top of
-                // the sidebar, so any edge that grows upward or is
-                // vertically centered on it pushes part of the popover
-                // above the window). NSPopover positions relative to the
-                // screen, not the parent window, and does NOT clip itself
-                // to the window's bounds — confirmed live that it was
-                // genuinely rendering outside Arthur's own window, not just
-                // a screenshot artifact. QuickAddModal's width is capped
-                // (see its own comment) to also avoid overflowing left,
-                // since .bottom still centers horizontally.
-                .popover(isPresented: $showingQuickAdd, arrowEdge: .bottom) {
-                    QuickAddModal(
-                        store: store, selectedTab: $selectedTab,
-                        showingAddTask: $showingAddTask, isPresented: $showingQuickAdd
-                    )
-                }
             }
             .padding(.horizontal, 14)
             .padding(.top, 14)

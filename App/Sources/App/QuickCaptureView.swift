@@ -194,16 +194,19 @@ struct QuickCaptureView: View {
     /// just this header row so the capture box above gets that space back.
     private var destinationHeader: some View {
         HStack {
-            // Mac keeps 15; iOS/iPadOS now match Theme.inputFontSize, part
-            // of Brandon's ask to standardize every scattered iOS label
-            // size to the header date's own size.
+            // Size: Mac keeps 15; iOS/iPadOS now match Theme.inputFontSize,
+            // part of Brandon's ask to standardize every scattered iOS
+            // label size to the header date's own size. Weight: matches
+            // Theme.headingWeight on both — the exact weight the header
+            // date itself uses — instead of a bespoke .semibold, per
+            // Brandon's explicit ask to match "Destination" to the date.
             #if os(macOS)
             Text("Destination")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 15, weight: Theme.headingWeight))
                 .foregroundStyle(Color.primary)
             #else
             Text("Destination")
-                .font(.system(size: Theme.inputFontSize(), weight: .semibold))
+                .font(.system(size: Theme.inputFontSize(), weight: Theme.headingWeight))
                 .foregroundStyle(Color.primary)
             #endif
             Spacer()

@@ -35,6 +35,10 @@ struct iPadLandscapeSidebar: View {
 
                 Spacer()
 
+                // Presentation lives at AgendaView's top level now
+                // (CenteredModal, mounted once, shared by every platform) —
+                // this button just flips the shared showingQuickAdd flag
+                // instead of anchoring its own popover.
                 Button {
                     showingQuickAdd = true
                 } label: {
@@ -44,12 +48,6 @@ struct iPadLandscapeSidebar: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .popover(isPresented: $showingQuickAdd) {
-                    QuickAddModal(
-                        store: store, selectedTab: $selectedTab,
-                        showingAddTask: $showingAddTask, isPresented: $showingQuickAdd
-                    )
-                }
             }
             .padding(.horizontal, 14)
             .padding(.top, 14)

@@ -103,7 +103,7 @@ struct SidebarNavList: View {
                 }
                 .foregroundStyle(Theme.primary(effectiveScheme))
                 .padding(.horizontal, 14)
-                .frame(height: navRowHeight + 2)
+                .frame(height: navRowHeight)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

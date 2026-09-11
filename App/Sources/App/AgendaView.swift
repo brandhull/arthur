@@ -62,7 +62,7 @@ struct AgendaView: View {
             MacAgendaLayout(
                 store: store, selectedTab: $selectedTab, quickCaptureSource: $quickCaptureSource,
                 showingSettings: $showingSettings, showingAddTask: $showingAddTask,
-                effectiveScheme: effectiveScheme
+                showingQuickAdd: $showingQuickAdd, effectiveScheme: effectiveScheme
             ) {
                 tabContent
             }
@@ -107,6 +107,19 @@ struct AgendaView: View {
             #endif
         }
         .background(Theme.background(effectiveScheme))
+        // Mounted once here (not per-button) so it centers over the entire
+        // window/screen on every platform — Mac's sidebar, iPad's landscape
+        // sidebar/portrait top bar, and iPhone's floating button all just
+        // flip this same showingQuickAdd flag now instead of each anchoring
+        // its own popover in a different spot with different fonts.
+        .overlay {
+            CenteredModal(isPresented: $showingQuickAdd, effectiveScheme: effectiveScheme) {
+                QuickAddModal(
+                    store: store, selectedTab: $selectedTab,
+                    showingAddTask: $showingAddTask, isPresented: $showingQuickAdd
+                )
+            }
+        }
         .preferredColorScheme(store.config.appearance == .system ? nil : effectiveScheme)
         #if os(macOS)
         .pinnedOnTop(store.config.pinOnTop)
@@ -207,11 +220,12 @@ struct AgendaView: View {
 
     /// iPhone-only floating quick-add button (iPad uses a non-floating
     /// button instead — see iOSAgendaLayout). Same circle/shadow/position
-    /// as the app's old "+" button; icon is now bubble.and.pencil and it
-    /// opens the same QuickAddModal Mac uses (New Task / Quick Capture /
-    /// inline New Reflection) instead of a plain 3-item Menu — `.popover`
-    /// auto-adapts into a bottom sheet on iPhone's compact width, which is
-    /// exactly right for the inline New Reflection compose box.
+    /// as the app's old "+" button; icon is bubble.and.pencil. Presentation
+    /// lives at AgendaView's top level now (CenteredModal, mounted once,
+    /// shared by every platform) — this button just flips the shared
+    /// showingQuickAdd flag instead of anchoring its own popover (which
+    /// used to auto-adapt into a bottom sheet here specifically, one of the
+    /// three different presentations Brandon asked to standardize).
     private var floatingAddButton: some View {
         Button {
             showingQuickAdd = true
@@ -224,12 +238,6 @@ struct AgendaView: View {
                 .shadow(color: Color.black.opacity(0.25), radius: 6, y: 3)
         }
         .buttonStyle(.plain)
-        .popover(isPresented: $showingQuickAdd) {
-            QuickAddModal(
-                store: store, selectedTab: $selectedTab,
-                showingAddTask: $showingAddTask, isPresented: $showingQuickAdd
-            )
-        }
     }
     #endif
 }

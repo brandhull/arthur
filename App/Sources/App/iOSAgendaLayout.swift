@@ -151,6 +151,10 @@ struct iOSAgendaLayout<Content: View>: View {
 
             // iPad portrait only — iPhone's quick-add is AgendaView's
             // floating button instead, per Brandon's explicit split.
+            // Presentation lives at AgendaView's top level now
+            // (CenteredModal, mounted once, shared by every platform) — this
+            // button just flips the shared showingQuickAdd flag instead of
+            // anchoring its own popover.
             if horizontalSizeClass == .regular {
                 Button {
                     showingQuickAdd = true
@@ -161,12 +165,6 @@ struct iOSAgendaLayout<Content: View>: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .popover(isPresented: $showingQuickAdd) {
-                    QuickAddModal(
-                        store: store, selectedTab: $selectedTab,
-                        showingAddTask: $showingAddTask, isPresented: $showingQuickAdd
-                    )
-                }
             }
 
             AppearanceCycleButton(store: store, effectiveScheme: effectiveScheme)

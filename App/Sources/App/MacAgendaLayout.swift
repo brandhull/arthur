@@ -17,6 +17,7 @@ struct MacAgendaLayout<Content: View>: View {
     @Binding var quickCaptureSource: QuickCaptureSource
     @Binding var showingSettings: Bool
     @Binding var showingAddTask: Bool
+    @Binding var showingQuickAdd: Bool
     let effectiveScheme: ColorScheme
     let content: Content
 
@@ -25,11 +26,11 @@ struct MacAgendaLayout<Content: View>: View {
     // across devices, and mixing single-window layout state into Config
     // would just add sync-conflict surface for no benefit.
     @AppStorage("sidebarCollapsed") private var sidebarCollapsed = false
-    @State private var showingQuickAdd = false
 
     init(
         store: TaskStore, selectedTab: Binding<HomeTab>, quickCaptureSource: Binding<QuickCaptureSource>,
-        showingSettings: Binding<Bool>, showingAddTask: Binding<Bool>, effectiveScheme: ColorScheme,
+        showingSettings: Binding<Bool>, showingAddTask: Binding<Bool>, showingQuickAdd: Binding<Bool>,
+        effectiveScheme: ColorScheme,
         @ViewBuilder content: () -> Content
     ) {
         self.store = store
@@ -37,6 +38,7 @@ struct MacAgendaLayout<Content: View>: View {
         self._quickCaptureSource = quickCaptureSource
         self._showingSettings = showingSettings
         self._showingAddTask = showingAddTask
+        self._showingQuickAdd = showingQuickAdd
         self.effectiveScheme = effectiveScheme
         self.content = content()
     }
