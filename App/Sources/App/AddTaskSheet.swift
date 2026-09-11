@@ -36,47 +36,101 @@ struct AddTaskSheet: View {
         #endif
     }
 
+    private func submit() {
+        let destination = store.config.inboxes.first { $0.id == destinationId } ?? store.config.defaultInbox
+        store.addTask(text: text, dueDate: includeDueDate ? dueDate : nil, destination: destination)
+        dismiss()
+    }
+
+    private var isSubmitDisabled: Bool {
+        text.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    @ViewBuilder
+    private var formFields: some View {
+        FieldLabel(title: "Task")
+        FieldBox(scheme: effectiveScheme) {
+            TextField("", text: $text)
+                .textFieldStyle(.plain)
+                .font(.system(size: inputFontSize))
+                .multilineTextAlignment(.leading)
+                .padding(12)
+        }
+
+        FieldLabel(title: "Due date (optional)")
+        FieldBox(scheme: effectiveScheme) {
+            VStack(alignment: .leading, spacing: 0) {
+                Toggle("Set a due date", isOn: $includeDueDate)
+                    .font(.system(size: inputFontSize))
+                    .padding(12)
+                if includeDueDate {
+                    Divider().padding(.leading, 12)
+                    DatePicker("Date", selection: $dueDate, displayedComponents: .date)
+                        .padding(12)
+                }
+            }
+        }
+
+        // A native Picker here (as this used to be) ignores explicit
+        // .font() sizing for its displayed value on iOS — the exact
+        // "Bits"/"Brandon" bug Brandon flagged in Baserow's Quick Capture
+        // form. Same MenuFieldPicker fix applied here for the same reason.
+        FieldLabel(title: "Destination (optional)")
+        FieldBox(scheme: effectiveScheme) {
+            MenuFieldPicker(
+                placeholder: "Default (\(store.config.defaultInbox?.name ?? "Craft Inbox"))",
+                options: store.config.inboxes.map { (label: $0.name, value: Optional($0.id)) },
+                noneValue: Optional<String>.none,
+                selection: $destinationId, fontSize: inputFontSize, scheme: effectiveScheme
+            )
+        }
+    }
+
     var body: some View {
+        #if os(iOS)
+        // No title, no Cancel — Brandon: "I know what I'm doing when I
+        // activate it." Dismiss is the X in the top-right corner (matching
+        // QuickAddModal's New Reflection), and Add sits bottom-right inside
+        // the content (matching New Reflection's own Add button) instead of
+        // a nav-bar toolbar item — no NavigationStack needed at all once
+        // neither chrome piece depends on it.
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                formFields
+
+                HStack {
+                    Spacer()
+                    PillButton(systemImage: "arrow.up.circle", label: "Add", action: submit)
+                        .disabled(isSubmitDisabled)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+            }
+            .padding(.top, 36)
+            .padding(.bottom, 16)
+        }
+        .foregroundStyle(Theme.primary(effectiveScheme))
+        .background(Theme.background(effectiveScheme))
+        .overlay(alignment: .topTrailing) {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.secondaryText(effectiveScheme))
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 6)
+            .padding(.trailing, 6)
+        }
+        .preferredColorScheme(store.config.appearance == .system ? nil : effectiveScheme)
+        #else
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    FieldLabel(title: "Task")
-                    FieldBox(scheme: effectiveScheme) {
-                        TextField("", text: $text)
-                            .textFieldStyle(.plain)
-                            .font(.system(size: inputFontSize))
-                            .multilineTextAlignment(.leading)
-                            .padding(12)
-                    }
-
-                    FieldLabel(title: "Due date (optional)")
-                    FieldBox(scheme: effectiveScheme) {
-                        VStack(alignment: .leading, spacing: 0) {
-                            Toggle("Set a due date", isOn: $includeDueDate)
-                                .font(.system(size: inputFontSize))
-                                .padding(12)
-                            if includeDueDate {
-                                Divider().padding(.leading, 12)
-                                DatePicker("Date", selection: $dueDate, displayedComponents: .date)
-                                    .padding(12)
-                            }
-                        }
-                    }
-
-                    // A native Picker here (as this used to be) ignores
-                    // explicit .font() sizing for its displayed value on
-                    // iOS — the exact "Bits"/"Brandon" bug Brandon flagged
-                    // in Baserow's Quick Capture form. Same MenuFieldPicker
-                    // fix applied here for the same reason.
-                    FieldLabel(title: "Destination (optional)")
-                    FieldBox(scheme: effectiveScheme) {
-                        MenuFieldPicker(
-                            placeholder: "Default (\(store.config.defaultInbox?.name ?? "Craft Inbox"))",
-                            options: store.config.inboxes.map { (label: $0.name, value: Optional($0.id)) },
-                            noneValue: Optional<String>.none,
-                            selection: $destinationId, fontSize: inputFontSize, scheme: effectiveScheme
-                        )
-                    }
+                    formFields
                 }
                 .padding(.bottom, 16)
             }
@@ -88,17 +142,12 @@ struct AddTaskSheet: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        let destination = store.config.inboxes.first { $0.id == destinationId } ?? store.config.defaultInbox
-                        store.addTask(text: text, dueDate: includeDueDate ? dueDate : nil, destination: destination)
-                        dismiss()
-                    }
-                    .disabled(text.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button("Add", action: submit)
+                        .disabled(isSubmitDisabled)
                 }
             }
         }
         .preferredColorScheme(store.config.appearance == .system ? nil : effectiveScheme)
-        #if os(macOS)
         .frame(minWidth: 420, idealWidth: 460, minHeight: 320, idealHeight: 360)
         #endif
     }
