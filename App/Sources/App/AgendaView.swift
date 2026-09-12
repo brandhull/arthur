@@ -28,6 +28,10 @@ struct AgendaView: View {
     #endif
     @State private var showingSettings = false
     @State private var showingAddTask = false
+    // "Document" quick-add flow — a new Craft page in a chosen folder, not
+    // part of the sidebar/drawer nav yet (Brandon: "for now"), reachable
+    // only via the quick-add popup's Document row.
+    @State private var showingDocumentCapture = false
     // Shared by iPhone's floating quick-add button and iPad's top-bar/
     // sidebar quick-add button — only one of the three is ever actually
     // mounted at a time depending on device/orientation, so one Bool is
@@ -116,7 +120,8 @@ struct AgendaView: View {
             CenteredModal(isPresented: $showingQuickAdd, effectiveScheme: effectiveScheme) {
                 QuickAddModal(
                     store: store, selectedTab: $selectedTab,
-                    showingAddTask: $showingAddTask, isPresented: $showingQuickAdd
+                    showingAddTask: $showingAddTask, showingDocumentCapture: $showingDocumentCapture,
+                    isPresented: $showingQuickAdd
                 )
             }
         }
@@ -129,6 +134,9 @@ struct AgendaView: View {
         }
         .sheet(isPresented: $showingAddTask) {
             AddTaskSheet(store: store)
+        }
+        .sheet(isPresented: $showingDocumentCapture) {
+            DocumentCaptureSheet(store: store)
         }
         .task {
             await store.refreshIfStale()

@@ -1,13 +1,16 @@
 import SwiftUI
 import ArthurKit
 
-/// The bubble.and.pencil quick-add popup's content. Three options: New Task
+/// The bubble.and.pencil quick-add popup's content. Four options: Task
 /// (opens AddTaskSheet unchanged), Quick Capture (just switches the
-/// selected tab), and New Reflection, which — per Brandon's explicit call —
-/// doesn't navigate anywhere: the modal transitions in place to a small
-/// inline compose box that appends straight to today's daily note, reusing
-/// DailyNoteComposeBox (the same view AddNoteSheet uses) rather than a
-/// second copy of that placeholder/PlainTextEditor logic.
+/// selected tab), Document (opens DocumentCaptureSheet — a new Craft page
+/// in a chosen folder, not part of the sidebar nav yet), and Reflection,
+/// which — per Brandon's explicit call — doesn't navigate anywhere: the
+/// modal transitions in place to a small inline compose box that appends
+/// straight to today's daily note, reusing DailyNoteComposeBox (the same
+/// view AddNoteSheet uses) rather than a second copy of that placeholder/
+/// PlainTextEditor logic. Row labels dropped their "New " prefix per
+/// Brandon's ask — "I know what I'm doing when I activate it."
 ///
 /// Platform-neutral — nothing in here is actually Mac-specific, and no more
 /// platform-split font sizes: every size here is Theme.inputFontSize(),
@@ -21,6 +24,7 @@ struct QuickAddModal: View {
     @ObservedObject var store: TaskStore
     @Binding var selectedTab: HomeTab
     @Binding var showingAddTask: Bool
+    @Binding var showingDocumentCapture: Bool
     @Binding var isPresented: Bool
     @Environment(\.colorScheme) private var systemScheme
 
@@ -58,7 +62,7 @@ struct QuickAddModal: View {
 
     private var menuBody: some View {
         VStack(alignment: .leading, spacing: 0) {
-            quickAddRow(title: "New Task", systemImage: "checkmark.circle") {
+            quickAddRow(title: "Task", systemImage: "checkmark.circle") {
                 isPresented = false
                 showingAddTask = true
             }
@@ -68,7 +72,12 @@ struct QuickAddModal: View {
                 selectedTab = .quickCapture
             }
             Divider()
-            quickAddRow(title: "New Reflection", systemImage: "moon.stars") {
+            quickAddRow(title: "Document", systemImage: "doc.badge.plus") {
+                isPresented = false
+                showingDocumentCapture = true
+            }
+            Divider()
+            quickAddRow(title: "Reflection", systemImage: "moon.stars") {
                 mode = .reflection
             }
         }
@@ -91,7 +100,7 @@ struct QuickAddModal: View {
 
     private var reflectionBody: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("New Reflection")
+            Text("Reflection")
                 .font(.system(size: Theme.inputFontSize(), weight: .semibold))
                 .padding(.horizontal, 14)
             DailyNoteComposeBox(

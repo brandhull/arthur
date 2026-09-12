@@ -14,3 +14,16 @@ public struct CraftDocument: Codable, Identifiable, Hashable {
         self.folder = folder
     }
 }
+
+/// A Craft folder — the "Document" quick-add flow's destination (a new page
+/// goes *into* a folder, unlike Quick Capture's Craft mode, which appends
+/// into an existing CraftDocument).
+public struct CraftFolder: Identifiable, Hashable {
+    public let id: String
+    public let name: String
+
+    public init(id: String, name: String) {
+        self.id = id
+        self.name = name
+    }
+}

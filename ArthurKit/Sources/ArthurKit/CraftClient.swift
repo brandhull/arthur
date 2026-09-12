@@ -461,6 +461,29 @@ public struct CraftClient {
                            command: "blocks add --id \(pageId) --markdown \(quoted) --position end")
     }
 
+    /// Creates a brand-new page via `documents create`, optionally inside a
+    /// folder — backs the "Document" quick-add flow (a new page, distinct
+    /// from Quick Capture's Craft mode which appends to an *existing* one).
+    /// Response shape wasn't verified live against the MCP endpoint (no
+    /// live Craft space to test `documents create` against while building
+    /// this) — extracts the first UUID-looking token the same tolerant way
+    /// resolveLink already does for `documents resolve-link`, rather than
+    /// assuming the exact text/JSON shape. Worth a live smoke test once
+    /// this ships.
+    public func createDocument(title: String, folderId: String?) async throws -> String {
+        var command = "documents create --title \(Self.craftQuote(title))"
+        if let folderId {
+            command += " --folder \(folderId)"
+        }
+        let text = try await call(tool: "craft_write", command: command)
+        let regex = try NSRegularExpression(pattern: #"[0-9A-Fa-f]{8}-[0-9A-Fa-f-]{27,}"#)
+        let range = NSRange(text.startIndex..., in: text)
+        guard let m = regex.firstMatch(in: text, range: range), let r = Range(m.range, in: text) else {
+            throw CraftError.badResponse
+        }
+        return String(text[r])
+    }
+
     /// One-time setup: turns a pasted Craft doc URL into a stable rootBlockId.
     public func resolveLink(_ craftURL: String) async throws -> String {
         let text = try await call(tool: "craft_read",
@@ -511,17 +534,20 @@ public struct CraftClient {
         return doc.id
     }
 
-    private func listFolders() async throws -> [(id: String, name: String)] {
+    /// Public — also backs the "Document" quick-add flow's folder-search
+    /// Destination card (Document mode picks a folder to create a new page
+    /// in, rather than an existing CraftDocument to append to).
+    public func listFolders() async throws -> [CraftFolder] {
         let text = try await call(tool: "craft_read", command: "folders list")
         let regex = try NSRegularExpression(pattern: #"<([0-9A-Fa-f-]+)>\s+(.+?)\s+\(\d+ docs?\)"#)
-        var folders: [(id: String, name: String)] = []
+        var folders: [CraftFolder] = []
         for line in text.split(separator: "\n") {
             let s = String(line)
             let range = NSRange(s.startIndex..., in: s)
             guard let m = regex.firstMatch(in: s, range: range),
                   let idR = Range(m.range(at: 1), in: s),
                   let nameR = Range(m.range(at: 2), in: s) else { continue }
-            folders.append((id: String(s[idR]), name: String(s[nameR])))
+            folders.append(CraftFolder(id: String(s[idR]), name: String(s[nameR])))
         }
         return folders
     }
