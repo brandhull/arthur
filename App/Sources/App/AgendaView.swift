@@ -125,23 +125,6 @@ struct AgendaView: View {
                 )
             }
         }
-        // Mac only — full-window `.overlay`, not `.sheet`: a SwiftUI sheet
-        // on macOS sizes itself to its content's own ideal size regardless
-        // of maxWidth/maxHeight, so it can't be made to actually fill the
-        // presenting window that way. iOS uses `.fullScreenCover` below
-        // instead, which already fills the screen natively. Brandon was
-        // explicit this should read as "full window" like the main Quick
-        // Capture tab, not a small popup/modal the way Add Task/Reflection
-        // intentionally are.
-        #if os(macOS)
-        .overlay {
-            if showingDocumentCapture {
-                DocumentCaptureSheet(store: store, isPresented: $showingDocumentCapture)
-                    .transition(.opacity)
-            }
-        }
-        .animation(.easeInOut(duration: 0.15), value: showingDocumentCapture)
-        #endif
         .preferredColorScheme(store.config.appearance == .system ? nil : effectiveScheme)
         #if os(macOS)
         .pinnedOnTop(store.config.pinOnTop)
@@ -152,11 +135,6 @@ struct AgendaView: View {
         .sheet(isPresented: $showingAddTask) {
             AddTaskSheet(store: store)
         }
-        #if os(iOS)
-        .fullScreenCover(isPresented: $showingDocumentCapture) {
-            DocumentCaptureSheet(store: store, isPresented: $showingDocumentCapture)
-        }
-        #endif
         .task {
             await store.refreshIfStale()
             documentStore.refreshIfStale(craftLink: store.config.craftLink)
@@ -220,24 +198,48 @@ struct AgendaView: View {
     /// pane, iOSAgendaLayout's main pane) so there's a single place that
     /// ever instantiates these four views — no redesign should grow a
     /// second, similar-looking copy that can drift out of sync.
+    ///
+    /// Document is a fifth layer here, same opacity-swap treatment, even
+    /// though it isn't a real HomeTab/sidebar row — Brandon's correction
+    /// after an earlier attempt covered the whole window (sidebar/hamburger
+    /// included) in a full-window overlay/fullScreenCover: he still needs
+    /// the sidebar or hamburger menu reachable while Document is showing,
+    /// exactly like every other tab. Embedding it here, inside whatever
+    /// MacAgendaLayout/iOSAgendaLayout's own chrome already wraps `content`
+    /// in, is what keeps that chrome visible. showingDocumentCapture drives
+    /// its visibility directly (not selectedTab, since Document has no
+    /// HomeTab case of its own); picking any real sidebar/drawer
+    /// destination while it's showing dismisses it via the onChange below.
     private var tabContent: some View {
         ZStack {
             RocksView(store: store)
-                .opacity(selectedTab == .rocks ? 1 : 0)
-                .allowsHitTesting(selectedTab == .rocks)
+                .opacity(selectedTab == .rocks && !showingDocumentCapture ? 1 : 0)
+                .allowsHitTesting(selectedTab == .rocks && !showingDocumentCapture)
             TasksView(store: store)
-                .opacity(selectedTab == .tasks ? 1 : 0)
-                .allowsHitTesting(selectedTab == .tasks)
+                .opacity(selectedTab == .tasks && !showingDocumentCapture ? 1 : 0)
+                .allowsHitTesting(selectedTab == .tasks && !showingDocumentCapture)
             QuickCaptureView(
                 store: store, documentStore: documentStore, source: $quickCaptureSource,
                 isActive: selectedTab == .quickCapture, isDestinationExpanded: $isDestinationExpanded
             )
-                .opacity(selectedTab == .quickCapture ? 1 : 0)
-                .allowsHitTesting(selectedTab == .quickCapture)
+                .opacity(selectedTab == .quickCapture && !showingDocumentCapture ? 1 : 0)
+                .allowsHitTesting(selectedTab == .quickCapture && !showingDocumentCapture)
             ReflectionView(store: store)
-                .opacity(selectedTab == .reflection ? 1 : 0)
-                .allowsHitTesting(selectedTab == .reflection)
+                .opacity(selectedTab == .reflection && !showingDocumentCapture ? 1 : 0)
+                .allowsHitTesting(selectedTab == .reflection && !showingDocumentCapture)
+            DocumentCaptureSheet(store: store, isPresented: $showingDocumentCapture)
+                .opacity(showingDocumentCapture ? 1 : 0)
+                .allowsHitTesting(showingDocumentCapture)
         }
+        // Picking any real destination while Document is showing dismisses
+        // it, the same way selecting any other tab always shows that tab —
+        // without this, tapping e.g. Rocks in the sidebar while Document is
+        // up would do nothing visible (Document has no HomeTab case to lose
+        // to). Doesn't cover re-tapping whatever tab was already selected
+        // underneath (onChange only fires on an actual value change) — the
+        // X button in Document itself is the fallback for that.
+        .onChange(of: selectedTab) { showingDocumentCapture = false }
+        .onChange(of: quickCaptureSource) { showingDocumentCapture = false }
     }
 
     #if os(iOS)

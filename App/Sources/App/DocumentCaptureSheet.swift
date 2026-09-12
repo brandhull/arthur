@@ -8,13 +8,17 @@ import ArthurKit
 /// (CraftClient.createDocument) rather than appending markdown to one that
 /// already exists. Not part of the sidebar/drawer nav yet — Brandon's
 /// explicit ask was "for now" only reachable via the quick-add popup's
-/// "Document" row. Presented full-window, not a small popup/modal — Brandon
-/// was explicit that this should read like the full Quick Capture Craft
-/// screen: a fullScreenCover on iOS, and on Mac a full-window `.overlay`
-/// (not `.sheet`) covering AgendaView entirely, since a SwiftUI `.sheet` on
-/// macOS sizes itself to its content's own ideal size regardless of
-/// maxWidth/maxHeight — telling it to grow doesn't make it actually fill
-/// the presenting window.
+/// "Document" row.
+///
+/// Embedded as a fifth opacity-swapped layer in AgendaView's tabContent,
+/// the same pattern as Rocks/Tasks/Quick Capture/Reflection — not a sheet
+/// or full-window cover. Two earlier attempts got this wrong in opposite
+/// directions: a small popup card (didn't read as "full window" like Quick
+/// Capture), then a true full-window overlay/fullScreenCover (covered the
+/// sidebar/hamburger menu too, which Brandon still needed reachable). This
+/// is what actually gives "looks like Quick Capture's screen, sidebar and
+/// all" — MacAgendaLayout/iOSAgendaLayout's own chrome already wraps
+/// tabContent, so embedding here inherits it for free.
 ///
 /// No "Add Separator" toggle here — that only makes sense when appending
 /// onto existing content, which this never does. The new page's title is
@@ -24,11 +28,11 @@ import ArthurKit
 /// exactly the same" as Quick Capture's, i.e. no separate Title field.
 struct DocumentCaptureSheet: View {
     @ObservedObject var store: TaskStore
-    // A binding, not @Environment(\.dismiss) — this view is presented two
-    // different ways (a real fullScreenCover on iOS, a plain `.overlay` on
-    // Mac with no actual presentation context for `dismiss()` to act on),
-    // so closing itself by flipping the same Bool the caller shows it with
-    // is what works identically either way.
+    // Not part of a real presentation (no sheet/fullScreenCover here to
+    // supply @Environment(\.dismiss)) — the X button closes this the same
+    // way picking a different sidebar destination does, by flipping the
+    // same showingDocumentCapture flag AgendaView's tabContent already
+    // keys this view's visibility on.
     @Binding var isPresented: Bool
     @Environment(\.colorScheme) private var systemScheme
     #if os(iOS)
@@ -164,10 +168,6 @@ struct DocumentCaptureSheet: View {
             .padding(.trailing, 6)
         }
         .onAppear(perform: handleOnAppear)
-        .preferredColorScheme(store.config.appearance == .system ? nil : effectiveScheme)
-        #if os(macOS)
-        .frame(minWidth: 420, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
-        #endif
     }
 
     private var destinationHeader: some View {
