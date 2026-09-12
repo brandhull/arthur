@@ -214,7 +214,13 @@ struct DocumentCaptureSheet: View {
                     .frame(minHeight: 120, maxHeight: .infinity)
             }
         }
-        .padding(.top, 36)
+        // 16, matching QuickCaptureView's craftCaptureBox exactly — was 36
+        // from an earlier pass when this was a standalone full-window
+        // overlay needing clearance for its own X button; now that it's
+        // embedded in tabContent like every other tab, that extra padding
+        // just pushed "Nothing here yet."/the cursor down further than
+        // Quick Capture's for no reason (Brandon caught this).
+        .padding(.top, 16)
     }
 
     @ViewBuilder
