@@ -125,6 +125,23 @@ struct AgendaView: View {
                 )
             }
         }
+        // Mac only — full-window `.overlay`, not `.sheet`: a SwiftUI sheet
+        // on macOS sizes itself to its content's own ideal size regardless
+        // of maxWidth/maxHeight, so it can't be made to actually fill the
+        // presenting window that way. iOS uses `.fullScreenCover` below
+        // instead, which already fills the screen natively. Brandon was
+        // explicit this should read as "full window" like the main Quick
+        // Capture tab, not a small popup/modal the way Add Task/Reflection
+        // intentionally are.
+        #if os(macOS)
+        .overlay {
+            if showingDocumentCapture {
+                DocumentCaptureSheet(store: store, isPresented: $showingDocumentCapture)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.15), value: showingDocumentCapture)
+        #endif
         .preferredColorScheme(store.config.appearance == .system ? nil : effectiveScheme)
         #if os(macOS)
         .pinnedOnTop(store.config.pinOnTop)
@@ -135,9 +152,11 @@ struct AgendaView: View {
         .sheet(isPresented: $showingAddTask) {
             AddTaskSheet(store: store)
         }
-        .sheet(isPresented: $showingDocumentCapture) {
-            DocumentCaptureSheet(store: store)
+        #if os(iOS)
+        .fullScreenCover(isPresented: $showingDocumentCapture) {
+            DocumentCaptureSheet(store: store, isPresented: $showingDocumentCapture)
         }
+        #endif
         .task {
             await store.refreshIfStale()
             documentStore.refreshIfStale(craftLink: store.config.craftLink)

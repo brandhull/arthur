@@ -8,7 +8,13 @@ import ArthurKit
 /// (CraftClient.createDocument) rather than appending markdown to one that
 /// already exists. Not part of the sidebar/drawer nav yet — Brandon's
 /// explicit ask was "for now" only reachable via the quick-add popup's
-/// "Document" row, presented as its own sheet the same way AddTaskSheet is.
+/// "Document" row. Presented full-window, not a small popup/modal — Brandon
+/// was explicit that this should read like the full Quick Capture Craft
+/// screen: a fullScreenCover on iOS, and on Mac a full-window `.overlay`
+/// (not `.sheet`) covering AgendaView entirely, since a SwiftUI `.sheet` on
+/// macOS sizes itself to its content's own ideal size regardless of
+/// maxWidth/maxHeight — telling it to grow doesn't make it actually fill
+/// the presenting window.
 ///
 /// No "Add Separator" toggle here — that only makes sense when appending
 /// onto existing content, which this never does. The new page's title is
@@ -18,7 +24,12 @@ import ArthurKit
 /// exactly the same" as Quick Capture's, i.e. no separate Title field.
 struct DocumentCaptureSheet: View {
     @ObservedObject var store: TaskStore
-    @Environment(\.dismiss) private var dismiss
+    // A binding, not @Environment(\.dismiss) — this view is presented two
+    // different ways (a real fullScreenCover on iOS, a plain `.overlay` on
+    // Mac with no actual presentation context for `dismiss()` to act on),
+    // so closing itself by flipping the same Bool the caller shows it with
+    // is what works identically either way.
+    @Binding var isPresented: Bool
     @Environment(\.colorScheme) private var systemScheme
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -100,7 +111,7 @@ struct DocumentCaptureSheet: View {
                 query = ""
                 self.selectedFolder = nil
                 isSubmitting = false
-                dismiss()
+                isPresented = false
             } catch {
                 errorMessage = error.localizedDescription
                 isSubmitting = false
@@ -140,7 +151,7 @@ struct DocumentCaptureSheet: View {
         .background(Theme.background(effectiveScheme))
         .overlay(alignment: .topTrailing) {
             Button {
-                dismiss()
+                isPresented = false
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .semibold))
@@ -155,7 +166,7 @@ struct DocumentCaptureSheet: View {
         .onAppear(perform: handleOnAppear)
         .preferredColorScheme(store.config.appearance == .system ? nil : effectiveScheme)
         #if os(macOS)
-        .frame(minWidth: 520, idealWidth: 620, minHeight: 480, idealHeight: 620)
+        .frame(minWidth: 420, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
         #endif
     }
 
