@@ -484,6 +484,30 @@ public struct CraftClient {
         return String(text[r])
     }
 
+    /// Full-space Craft search (Craft's own in-app search, not scoped to a
+    /// folder — the `search` command has no `--folder` flag, only
+    /// `--location unsorted|trash|templates|daily_notes`) — backs "Search
+    /// Craft"'s retrieval step. Response shape wasn't verified live against
+    /// the MCP endpoint while building this; parses the same "<uuid> title"
+    /// line shape every other `craft_read` list command
+    /// (documents/folders/tasks) actually uses, on the assumption `search`
+    /// follows the same convention. Worth a live smoke test once this
+    /// ships.
+    public func search(_ query: String) async throws -> [CraftSearchResult] {
+        let text = try await call(tool: "craft_read", command: "search \(Self.craftQuote(query))")
+        let lineRegex = try NSRegularExpression(pattern: #"^\s*<([0-9A-Fa-f-]+)>\s+(.+)$"#)
+        var results: [CraftSearchResult] = []
+        for line in text.split(separator: "\n") {
+            let s = String(line)
+            let range = NSRange(s.startIndex..., in: s)
+            guard let m = lineRegex.firstMatch(in: s, range: range),
+                  let idR = Range(m.range(at: 1), in: s),
+                  let titleR = Range(m.range(at: 2), in: s) else { continue }
+            results.append(CraftSearchResult(id: String(s[idR]), title: String(s[titleR]).trimmingCharacters(in: .whitespaces)))
+        }
+        return results
+    }
+
     /// One-time setup: turns a pasted Craft doc URL into a stable rootBlockId.
     public func resolveLink(_ craftURL: String) async throws -> String {
         let text = try await call(tool: "craft_read",

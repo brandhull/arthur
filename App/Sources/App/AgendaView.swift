@@ -1,20 +1,24 @@
 import SwiftUI
 import ArthurKit
 
-/// Which of the four home-screen tabs is showing. Order matches Brandon's
-/// explicit request: Rocks, Tasks, Quick Capture, then Reflection. No SF
-/// Symbols for now — a deliberate simplification, not an oversight.
+/// Which of the home-screen tabs is showing. Order matches Brandon's
+/// explicit request: Rocks, Tasks, Quick Capture, Reflection, then Search
+/// Craft. No SF Symbols for now — a deliberate simplification, not an
+/// oversight.
 ///
-/// Search Baserow was a fifth tab here, removed once Brandon found he
+/// Search Baserow used to be a fifth tab here, removed once Brandon found he
 /// wasn't using it at all — he's spinning Baserow browsing out into its own
 /// separate app instead. Quick Capture's own Craft/Baserow toggle (pushing
-/// a row into a table) is unrelated and stays; only the standalone
-/// search-and-browse tab is gone.
+/// a row into a table) is unrelated and stays; only that standalone
+/// search-and-browse tab was gone. Search Craft is a different thing
+/// entirely — natural-language Q&A over Craft content via CraftClient.search
+/// + AnthropicClient, not a browse-and-pick-a-destination tool.
 enum HomeTab: String, CaseIterable, Identifiable {
     case rocks = "Rocks"
     case tasks = "Tasks"
     case quickCapture = "Quick Capture"
     case reflection = "Reflection"
+    case searchCraft = "Search Craft"
     var id: String { rawValue }
 }
 
@@ -227,6 +231,9 @@ struct AgendaView: View {
             ReflectionView(store: store)
                 .opacity(selectedTab == .reflection && !showingDocumentCapture ? 1 : 0)
                 .allowsHitTesting(selectedTab == .reflection && !showingDocumentCapture)
+            SearchCraftView(store: store)
+                .opacity(selectedTab == .searchCraft && !showingDocumentCapture ? 1 : 0)
+                .allowsHitTesting(selectedTab == .searchCraft && !showingDocumentCapture)
             DocumentCaptureSheet(store: store, isPresented: $showingDocumentCapture)
                 .opacity(showingDocumentCapture ? 1 : 0)
                 .allowsHitTesting(showingDocumentCapture)

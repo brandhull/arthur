@@ -20,6 +20,7 @@ struct SettingsView: View {
     @Environment(\.colorScheme) private var systemScheme
 
     @State private var craftLink: String = ""
+    @State private var anthropicApiKey: String = ""
 
     // Reads store.config directly — Settings no longer has its own Appearance
     // picker (moved to AppearanceSwitcher, top-right of the Mac main pane),
@@ -93,6 +94,20 @@ struct SettingsView: View {
                     FieldLabel(title: "Craft connection")
                     FieldBox(scheme: effectiveScheme) {
                         TextField("", text: $craftLink)
+                            .multilineTextAlignment(.leading)
+                            #if os(iOS)
+                            .textInputAutocapitalization(.never)
+                            #endif
+                            .autocorrectionDisabled()
+                            .font(fieldFont)
+                            .padding(12)
+                    }
+
+                    // Search Craft's answer-synthesis step — a real
+                    // Anthropic API key, separate from craftLink's MCP link.
+                    FieldLabel(title: "Anthropic API key")
+                    FieldBox(scheme: effectiveScheme) {
+                        TextField("sk-ant-...", text: $anthropicApiKey)
                             .multilineTextAlignment(.leading)
                             #if os(iOS)
                             .textInputAutocapitalization(.never)
@@ -524,6 +539,7 @@ struct SettingsView: View {
         hasDebugLog = FileManager.default.fileExists(atPath: debugLogURL.path)
         hasTaskTraceLog = FileManager.default.fileExists(atPath: taskTraceLogURL.path)
         craftLink = store.config.craftLink
+        anthropicApiKey = store.config.anthropicApiKey
         inboxes = store.config.inboxes
         defaultInboxId = store.config.defaultInboxId
         baserowToken = store.config.baserowToken
@@ -595,6 +611,7 @@ struct SettingsView: View {
             defaultInboxId = nil
         }
         store.config.craftLink = craftLink
+        store.config.anthropicApiKey = anthropicApiKey
         store.config.inboxes = inboxes
         store.config.defaultInboxId = defaultInboxId
         store.config.baserowToken = baserowToken

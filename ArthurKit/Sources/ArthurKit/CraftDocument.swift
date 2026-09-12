@@ -27,3 +27,14 @@ public struct CraftFolder: Identifiable, Hashable {
         self.name = name
     }
 }
+
+/// One match from CraftClient.search — "Search Craft"'s retrieval step.
+public struct CraftSearchResult: Identifiable, Hashable {
+    public let id: String      // rootBlockId, usable with pageMarkdown/clickableLink
+    public let title: String
+
+    public init(id: String, title: String) {
+        self.id = id
+        self.title = title
+    }
+}
