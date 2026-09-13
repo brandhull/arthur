@@ -127,22 +127,34 @@ struct SearchCraftView: View {
                     return
                 }
                 // Top 3, not just the first — Craft's search ranks by
-                // keyword relevance, not by whether a result actually
+                // keyword-hit count, not by whether a result actually
                 // contains the answer, so a few candidates gives Claude a
                 // better shot at finding it. "From:" below still attributes
                 // to the top-ranked one as a reasonable approximation, even
                 // though the real answer could technically come from any of
-                // the three.
+                // the three. Each result's own matched snippet is included
+                // too (in addition to the full page fetch below) since it's
+                // often the most directly relevant text in the whole page.
                 let topResults = Array(results.prefix(3))
                 var combined = ""
+                var titleById: [String: String] = [:]
                 for result in topResults {
-                    let content = (try? await craft.pageMarkdown(rootBlockId: result.id)) ?? ""
-                    combined += "### \(result.title)\n\(content)\n\n"
+                    let title: String
+                    let content: String
+                    if let fetched = try? await craft.pageTitleAndMarkdown(rootBlockId: result.id) {
+                        title = fetched.title.isEmpty ? "Untitled" : fetched.title
+                        content = fetched.markdown
+                    } else {
+                        title = "Untitled"
+                        content = ""
+                    }
+                    titleById[result.id] = title
+                    combined += "### \(title)\nMatched excerpt: \(result.snippet)\n\(content)\n\n"
                 }
                 let anthropic = AnthropicClient(apiKey: store.config.anthropicApiKey)
                 let response = try await anthropic.ask(question: q, context: combined)
                 answer = response
-                sourceTitle = topResults.first?.title
+                sourceTitle = topResults.first.flatMap { titleById[$0.id] }
                 sourceId = topResults.first?.id
                 isSearching = false
             } catch {

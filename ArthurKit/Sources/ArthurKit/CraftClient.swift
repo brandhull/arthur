@@ -493,19 +493,134 @@ public struct CraftClient {
     /// (documents/folders/tasks) actually uses, on the assumption `search`
     /// follows the same convention. Worth a live smoke test once this
     /// ships.
+    /// Craft's `search` matches a multi-word query as a literal exact
+    /// phrase, not an OR of keywords — confirmed live 2026-09-12: searching
+    /// "pauba building code" found nothing (that exact 3-word run never
+    /// appears verbatim in the source block), but searching "pauba" alone
+    /// immediately found "82759 building code for the stake center at
+    /// pauba". So a natural-language question has to be broken into
+    /// individual keywords and searched one at a time, then merged — this
+    /// is what makes buried-factoid recall actually work for a question
+    /// like "What's the Pacific building code?" against real (non-adjacent)
+    /// phrasing.
+    private static let searchStopwords: Set<String> = [
+        "whats", "what", "is", "are", "was", "were", "the", "a", "an", "of", "in", "on", "at",
+        "for", "to", "and", "or", "this", "that", "my", "your", "his", "her", "its", "do", "does",
+        "did", "how", "when", "where", "who", "whom", "which", "find", "tell", "me", "please",
+        "can", "you", "i", "there"
+    ]
+
+    /// One line-item from Craft's real `search` response format (confirmed
+    /// live): a numbered block of
+    /// `Document <uuid>` / `Blocks: <uuid>` / `Match:` / snippet line(s) /
+    /// `Created:` / `Modified:`. No title anywhere in this response.
+    private struct RawSearchMatch {
+        let documentId: String
+        let blockId: String
+        let snippet: String
+    }
+
+    private static func parseSearchResponse(_ text: String) -> [RawSearchMatch] {
+        let docRegex = try? NSRegularExpression(pattern: #"Document <([0-9A-Fa-f-]+)>"#)
+        let blockRegex = try? NSRegularExpression(pattern: #"Blocks:\s*([0-9A-Fa-f-]+)"#)
+        var matches: [RawSearchMatch] = []
+        var currentDoc: String?
+        var currentBlock: String?
+        var collectingSnippet = false
+        var snippetLines: [String] = []
+
+        func flush() {
+            defer { currentDoc = nil; currentBlock = nil; snippetLines = []; collectingSnippet = false }
+            guard let doc = currentDoc, let block = currentBlock else { return }
+            let snippet = snippetLines.joined(separator: " ")
+                .replacingOccurrences(of: "**", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !snippet.isEmpty else { return }
+            matches.append(RawSearchMatch(documentId: doc, blockId: block, snippet: snippet))
+        }
+
+        for line in text.components(separatedBy: "\n") {
+            let range = NSRange(line.startIndex..., in: line)
+            if let m = docRegex?.firstMatch(in: line, range: range), let r = Range(m.range(at: 1), in: line) {
+                flush()
+                currentDoc = String(line[r])
+                continue
+            }
+            if let m = blockRegex?.firstMatch(in: line, range: range), let r = Range(m.range(at: 1), in: line) {
+                currentBlock = String(line[r])
+                continue
+            }
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed == "Match:" {
+                collectingSnippet = true
+                snippetLines = []
+                continue
+            }
+            if trimmed.hasPrefix("Created:") {
+                collectingSnippet = false
+                continue
+            }
+            if collectingSnippet && !trimmed.isEmpty {
+                snippetLines.append(trimmed)
+            }
+        }
+        flush()
+        return matches
+    }
+
+    /// One result per document (its highest-keyword-hit block wins),
+    /// ranked by how many of the question's keywords matched it.
     public func search(_ query: String) async throws -> [CraftSearchResult] {
-        let text = try await call(tool: "craft_read", command: "search \(Self.craftQuote(query))")
-        let lineRegex = try NSRegularExpression(pattern: #"^\s*<([0-9A-Fa-f-]+)>\s+(.+)$"#)
+        var seen = Set<String>()
+        var keywords: [String] = []
+        for token in query.lowercased().components(separatedBy: CharacterSet.alphanumerics.inverted) {
+            guard token.count > 1, !Self.searchStopwords.contains(token), seen.insert(token).inserted else { continue }
+            keywords.append(token)
+        }
+        if keywords.isEmpty {
+            let fallback = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !fallback.isEmpty else { return [] }
+            keywords = [fallback]
+        }
+        // Caps the number of round trips for an unusually long question —
+        // six keywords is already generous for finding a buried factoid.
+        keywords = Array(keywords.prefix(6))
+
+        var scoreByKey: [String: Int] = [:]
+        var snippetByKey: [String: String] = [:]
+        var docOfKey: [String: String] = [:]
+        for keyword in keywords {
+            let text = (try? await call(tool: "craft_read", command: "search \(Self.craftQuote(keyword))")) ?? ""
+            for match in Self.parseSearchResponse(text) {
+                let key = "\(match.documentId)|\(match.blockId)"
+                scoreByKey[key, default: 0] += 1
+                docOfKey[key] = match.documentId
+                if snippetByKey[key] == nil { snippetByKey[key] = match.snippet }
+            }
+        }
+
+        var seenDocs = Set<String>()
         var results: [CraftSearchResult] = []
-        for line in text.split(separator: "\n") {
-            let s = String(line)
-            let range = NSRange(s.startIndex..., in: s)
-            guard let m = lineRegex.firstMatch(in: s, range: range),
-                  let idR = Range(m.range(at: 1), in: s),
-                  let titleR = Range(m.range(at: 2), in: s) else { continue }
-            results.append(CraftSearchResult(id: String(s[idR]), title: String(s[titleR]).trimmingCharacters(in: .whitespaces)))
+        for key in scoreByKey.keys.sorted(by: { (scoreByKey[$0] ?? 0) > (scoreByKey[$1] ?? 0) }) {
+            guard let docId = docOfKey[key], seenDocs.insert(docId).inserted else { continue }
+            results.append(CraftSearchResult(id: docId, snippet: snippetByKey[key] ?? ""))
         }
         return results
+    }
+
+    /// Fetches a page's title alongside its content in one round trip —
+    /// used by Search Craft to attribute an answer ("From: <title>")
+    /// without a second call per candidate.
+    public func pageTitleAndMarkdown(rootBlockId: String) async throws -> (title: String, markdown: String) {
+        let text = try await call(tool: "craft_read", command: "blocks get \(rootBlockId) --format markdown")
+        return (Self.extractPageTitle(text), Self.extractPageContent(text))
+    }
+
+    private static func extractPageTitle(_ text: String) -> String {
+        guard let openRange = text.range(of: "<pageTitle>"),
+              let closeRange = text.range(of: "</pageTitle>", range: openRange.upperBound..<text.endIndex)
+        else { return "" }
+        return String(text[openRange.upperBound..<closeRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// One-time setup: turns a pasted Craft doc URL into a stable rootBlockId.

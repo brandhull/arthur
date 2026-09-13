@@ -40,7 +40,7 @@ public struct AnthropicClient {
         req.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
 
         let prompt = """
-        Answer the question using only the notes below. Be concise — give just the direct answer, no preamble or restating the question. If the notes don't actually contain the answer, say so plainly rather than guessing.
+        Answer the question using only the notes below. Be concise — give just the direct answer, no preamble or restating the question. If the notes don't actually contain the answer, say so plainly rather than guessing. Plain text only — no markdown (no **bold**, no bullet points, no headers); the answer is displayed as plain, unformatted text.
 
         Question: \(question)
 
