@@ -64,7 +64,7 @@ struct QuickAddView: View {
         // the panel grow when the due-date picker appears and shrink back
         // when it's hidden, rather than clipping into a fixed size.
         .fixedSize(horizontal: false, vertical: true)
-        .frame(width: 340)
+        .frame(width: 390)
         // Always dark — Brandon's explicit ask, no setting to change it.
         .preferredColorScheme(.dark)
         .onAppear { config = Config.load() }

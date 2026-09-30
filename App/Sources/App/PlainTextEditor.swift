@@ -44,6 +44,18 @@ import SwiftUI
 /// cursor still visible/advancing, still able to type, but no glyphs) — see
 /// the markedTextRange guard in UITextViewBridge.updateUIView for the root
 /// cause and fix.
+/// Shared by both platform bridges below — detects a "- "/"* " bullet marker
+/// at the start of a line (any leading whitespace/tabs preserved as part of
+/// the marker, so a nested/indented bullet's Return continues at the same
+/// indent). Plain string logic, no platform text types, so both the AppKit
+/// and UIKit bridges can call the same thing instead of drifting apart.
+private func bulletMarker(in line: String) -> String? {
+    let leading = line.prefix { $0 == " " || $0 == "\t" }
+    let rest = line[leading.endIndex...]
+    guard rest.hasPrefix("- ") || rest.hasPrefix("* ") else { return nil }
+    return String(leading) + rest.prefix(2)
+}
+
 struct PlainTextEditor: View {
     @Binding var text: String
     let fontSize: CGFloat
@@ -97,7 +109,33 @@ private struct UITextViewBridge: UIViewRepresentable {
         view.autocorrectionType = .default
         view.delegate = context.coordinator
         view.text = text
+        Self.applyBulletIndent(view)
         return view
+    }
+
+    /// Word-processor-style bullet continuation: typing "- " (or "* ") and
+    /// hitting Return keeps the marker going on the next line; hitting
+    /// Return again on an now-empty bullet line exits bullet mode instead of
+    /// stacking another dash — same two behaviors Notes/Word use. Paired
+    /// with a hanging indent (applyBulletIndent below) so a wrapped bullet's
+    /// second line lines up under its text, not back under the dash.
+    /// Doesn't touch Craft's markdown: the literal "- " stays in the plain
+    /// string that gets pushed, this is purely how it's laid out on screen
+    /// while typing.
+    static func applyBulletIndent(_ textView: UITextView) {
+        let ns = textView.text as NSString
+        let font = textView.font ?? .systemFont(ofSize: 15)
+        let storage = textView.textStorage
+        storage.beginEditing()
+        ns.enumerateSubstrings(in: NSRange(location: 0, length: ns.length), options: .byParagraphs) { substring, _, enclosingRange, _ in
+            let style = NSMutableParagraphStyle()
+            if let marker = bulletMarker(in: substring ?? "") {
+                let width = (marker as NSString).size(withAttributes: [.font: font]).width
+                style.headIndent = width
+            }
+            storage.addAttribute(.paragraphStyle, value: style, range: enclosingRange)
+        }
+        storage.endEditing()
     }
 
     func updateUIView(_ uiView: UITextView, context: Context) {
@@ -120,6 +158,7 @@ private struct UITextViewBridge: UIViewRepresentable {
         if uiView.text != text { uiView.text = text }
         if uiView.font != font { uiView.font = font }
         if uiView.textColor != textColor { uiView.textColor = textColor }
+        Self.applyBulletIndent(uiView)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
@@ -129,6 +168,40 @@ private struct UITextViewBridge: UIViewRepresentable {
         init(text: Binding<String>) { self.text = text }
         func textViewDidChange(_ textView: UITextView) {
             text.wrappedValue = textView.text
+            UITextViewBridge.applyBulletIndent(textView)
+        }
+
+        /// Only intercepts an actual Return keypress (a lone "\n" insertion)
+        /// — everything else (typing, paste, autocomplete) passes through
+        /// unchanged. See PlainTextEditor's doc comment for why a manual
+        /// NSTextStorage edit is used instead of letting UIKit insert the
+        /// newline itself: it's the only way to also splice in the
+        /// continued/removed bullet marker in the same edit.
+        func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText replacement: String) -> Bool {
+            guard replacement == "\n" else { return true }
+            let ns = textView.text as NSString
+            var lineStart = 0, lineEnd = 0, contentsEnd = 0
+            ns.getLineStart(&lineStart, end: &lineEnd, contentsEnd: &contentsEnd, for: range)
+            let contentRange = NSRange(location: lineStart, length: contentsEnd - lineStart)
+            let lineText = ns.substring(with: contentRange)
+            guard let marker = bulletMarker(in: lineText) else { return true }
+
+            let afterMarker = lineText.dropFirst(marker.count)
+            let storage = textView.textStorage
+            if afterMarker.trimmingCharacters(in: .whitespaces).isEmpty {
+                // Empty bullet ("- " with nothing typed after it yet) —
+                // Return exits bullet mode by clearing the marker instead of
+                // starting a new bulleted line.
+                storage.replaceCharacters(in: contentRange, with: "")
+                textView.selectedRange = NSRange(location: contentRange.location, length: 0)
+            } else {
+                let insertion = "\n" + marker
+                storage.replaceCharacters(in: range, with: insertion)
+                textView.selectedRange = NSRange(location: range.location + (insertion as NSString).length, length: 0)
+            }
+            text.wrappedValue = textView.text
+            UITextViewBridge.applyBulletIndent(textView)
+            return false
         }
     }
 }
@@ -165,6 +238,7 @@ private struct NSTextViewBridge: NSViewRepresentable {
         textView.isAutomaticSpellingCorrectionEnabled = true
         textView.delegate = context.coordinator
         textView.string = text
+        Self.applyBulletIndent(textView)
 
         let scrollView = NSScrollView()
         scrollView.documentView = textView
@@ -181,6 +255,26 @@ private struct NSTextViewBridge: NSViewRepresentable {
         return scrollView
     }
 
+    /// Same behavior/reasoning as UITextViewBridge's version of this — see
+    /// its doc comment. NSParagraphStyle/.paragraphStyle is the same
+    /// Foundation type/key on both platforms, just measured against an
+    /// NSFont here instead of a UIFont.
+    static func applyBulletIndent(_ textView: NSTextView) {
+        let ns = textView.string as NSString
+        let font = textView.font ?? .systemFont(ofSize: 15)
+        guard let storage = textView.textStorage else { return }
+        storage.beginEditing()
+        ns.enumerateSubstrings(in: NSRange(location: 0, length: ns.length), options: .byParagraphs) { substring, _, enclosingRange, _ in
+            let style = NSMutableParagraphStyle()
+            if let marker = bulletMarker(in: substring ?? "") {
+                let width = (marker as NSString).size(withAttributes: [.font: font]).width
+                style.headIndent = width
+            }
+            storage.addAttribute(.paragraphStyle, value: style, range: enclosingRange)
+        }
+        storage.endEditing()
+    }
+
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         guard let textView = nsView.documentView as? NSTextView else { return }
         // Same class of bug as UITextViewBridge's identical guard (see its
@@ -192,6 +286,7 @@ private struct NSTextViewBridge: NSViewRepresentable {
         if textView.string != text { textView.string = text }
         if textView.font != font { textView.font = font }
         if textView.textColor != textColor { textView.textColor = textColor }
+        Self.applyBulletIndent(textView)
         // Edge-triggered, not "focus whenever true" — this view is never
         // destroyed/recreated across an outer tab switch (the opacity-swap
         // pattern), so without tracking the previous value, an already-true
@@ -214,6 +309,34 @@ private struct NSTextViewBridge: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             text.wrappedValue = textView.string
+            NSTextViewBridge.applyBulletIndent(textView)
+        }
+
+        /// Same bullet-continue/exit behavior as UITextViewBridge's
+        /// shouldChangeTextIn — see its doc comment. AppKit's equivalent
+        /// interception point is doCommandBy:, firing for the Return key's
+        /// insertNewline: selector specifically (not every text change, so
+        /// no replacement-text filter needed the way iOS's delegate call
+        /// does).
+        func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            guard commandSelector == #selector(NSResponder.insertNewline(_:)) else { return false }
+            let ns = textView.string as NSString
+            let selRange = textView.selectedRange()
+            var lineStart = 0, lineEnd = 0, contentsEnd = 0
+            ns.getLineStart(&lineStart, end: &lineEnd, contentsEnd: &contentsEnd, for: selRange)
+            let contentRange = NSRange(location: lineStart, length: contentsEnd - lineStart)
+            let lineText = ns.substring(with: contentRange)
+            guard let marker = bulletMarker(in: lineText) else { return false }
+
+            let afterMarker = lineText.dropFirst(marker.count)
+            if afterMarker.trimmingCharacters(in: .whitespaces).isEmpty {
+                textView.insertText("", replacementRange: contentRange)
+            } else {
+                textView.insertText("\n" + marker, replacementRange: selRange)
+            }
+            text.wrappedValue = textView.string
+            NSTextViewBridge.applyBulletIndent(textView)
+            return true
         }
     }
 }

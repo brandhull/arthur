@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        installEditMenu()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.autosaveName = "ArthurBar"
         if let button = statusItem.button {
@@ -134,9 +135,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// (via NSHostingController's sizingOptions) before reading `frame.size`,
     /// so a panel that hasn't been shown yet still centers correctly rather
     /// than off whatever stale/default size it started with.
+    ///
+    /// Centers on whichever screen currently has the mouse cursor, not
+    /// `NSScreen.main` — on a multi-monitor setup `.main` tracks the screen
+    /// with the key window, but this app is a background accessory with no
+    /// window ever key, so `.main` doesn't reliably track wherever Brandon
+    /// is actually looking/working when he presses the hotkey. That's what
+    /// made the panel feel like it opened in "an odd location": it could
+    /// center on a display he wasn't even looking at.
     private func centerOnMainScreen(_ panel: NSPanel) {
         panel.layoutIfNeeded()
-        guard let screen = NSScreen.main else {
+        let mouseLocation = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { $0.frame.contains(mouseLocation) } ?? NSScreen.main
+        guard let screen else {
             panel.center()
             return
         }
@@ -175,6 +186,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let quickCapturePanel { centerOnMainScreen(quickCapturePanel) }
         NSApp.activate(ignoringOtherApps: true)
         quickCapturePanel?.makeKeyAndOrderFront(nil)
+    }
+
+    /// ArthurBar has no window-based main menu of its own — it's a status-
+    /// item-only accessory app, `statusItem.menu` is the only NSMenu it ever
+    /// builds, and `NSApp.mainMenu` was never set. That's exactly why Cmd+V
+    /// (and Cmd+C/X/A) silently did nothing in the Quick Task/Quick Capture
+    /// panels: macOS's key-equivalent dispatch for Cut/Copy/Paste/Select All
+    /// is wired through the app's Edit menu items (even though they're never
+    /// clicked) — no main menu means no Edit menu means those key
+    /// equivalents never resolve to the standard `paste:`/`copy:`/etc.
+    /// responder-chain actions, regardless of which text control has focus.
+    /// A minimal, invisible-to-the-user main menu (this app has no Dock
+    /// icon or app switcher entry, so this menu is never actually seen)
+    /// with standard nil-targeted Edit items is the fix — nil target routes
+    /// each action to whatever's first responder at the time, which is
+    /// exactly the focused text field/view in whichever panel is open.
+    private func installEditMenu() {
+        let mainMenu = NSMenu()
+        let appMenuItem = NSMenuItem()
+        mainMenu.addItem(appMenuItem)
+        let appMenu = NSMenu()
+        appMenuItem.submenu = appMenu
+
+        let editMenuItem = NSMenuItem()
+        mainMenu.addItem(editMenuItem)
+        let editMenu = NSMenu(title: "Edit")
+        editMenuItem.submenu = editMenu
+        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+
+        NSApp.mainMenu = mainMenu
     }
 
     private func buildMenu() -> NSMenu {

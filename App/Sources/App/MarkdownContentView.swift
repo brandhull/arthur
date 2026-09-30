@@ -65,10 +65,34 @@ struct MarkdownContentView: View {
         return Line(text: attributed, style: style)
     }
 
+    // Uniform 10pt between every line read as cramped for a Craft doc with
+    // real structure (Rocks: a bold heading + checkbox, then its own child
+    // bullets) — ported from the same readability pass Brandon just did in
+    // Maverick: 4pt in-paragraph line spacing, and a bigger gap between
+    // separate "entries" than between a heading/label and the body right
+    // under it. Concretely here: 6pt from a heading down to its first line
+    // (tight — reads as one unit, "label-to-body"), 20pt before a new
+    // heading starts (separates one Rock/entry from the next), 10pt between
+    // ordinary consecutive body lines (unchanged from before).
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(lines) { line in render(line) }
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
+                render(line).padding(.top, topSpacing(at: index))
+            }
         }
+    }
+
+    private func topSpacing(at index: Int) -> CGFloat {
+        guard index > 0 else { return 0 }
+        let previous = lines[index - 1].style
+        if isHeading(lines[index].style), !isHeading(previous) { return 20 }
+        if isHeading(previous) { return 6 }
+        return 10
+    }
+
+    private func isHeading(_ style: Style) -> Bool {
+        if case .heading = style { return true }
+        return false
     }
 
     @ViewBuilder
@@ -81,20 +105,20 @@ struct MarkdownContentView: View {
         case .bullet:
             HStack(alignment: .top, spacing: 8) {
                 Text("•").font(.system(size: bodySize))
-                Text(line.text).font(.system(size: bodySize)).lineSpacing(3)
+                Text(line.text).font(.system(size: bodySize)).lineSpacing(4)
             }
             .foregroundStyle(Theme.primary(scheme))
         case .numbered(let n):
             HStack(alignment: .top, spacing: 8) {
                 Text("\(n).").font(.system(size: bodySize))
-                Text(line.text).font(.system(size: bodySize)).lineSpacing(3)
+                Text(line.text).font(.system(size: bodySize)).lineSpacing(4)
             }
             .foregroundStyle(Theme.primary(scheme))
         case .quote:
             Text(line.text)
                 .font(.system(size: bodySize))
                 .italic()
-                .lineSpacing(3)
+                .lineSpacing(4)
                 .foregroundStyle(Theme.secondaryText(scheme))
                 .padding(.leading, 10)
                 .overlay(alignment: .leading) {
@@ -103,7 +127,7 @@ struct MarkdownContentView: View {
         case .paragraph:
             Text(line.text)
                 .font(.system(size: bodySize))
-                .lineSpacing(3)
+                .lineSpacing(4)
                 .foregroundStyle(Theme.primary(scheme))
         }
     }

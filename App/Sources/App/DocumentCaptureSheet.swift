@@ -197,6 +197,18 @@ struct DocumentCaptureSheet: View {
         .padding(.horizontal, 20)
         .padding(.top, 14)
         .padding(.bottom, isDestinationExpanded ? 0 : 14)
+        #if os(macOS)
+        // Mac-only, per Brandon's ask: when collapsed, the whole bar (not
+        // just the small chevron hit-target) expands it. The chevron
+        // button's own tap still consumes its own region and calls its own
+        // toggle action first, so this only ever fires for a click
+        // elsewhere on the bar — never double-toggles back to collapsed.
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard !isDestinationExpanded else { return }
+            withAnimation(.easeInOut(duration: 0.15)) { isDestinationExpanded = true }
+        }
+        #endif
     }
 
     @ViewBuilder

@@ -4,14 +4,14 @@ import ArthurKit
 /// Natural-language Q&A over Craft content — not a browse-and-pick tool like
 /// Quick Capture's document search. Brandon's example: "What's the Pacific
 /// building code?" should surface "12345" directly, not just point at the
-/// document it's buried in. Two-step pipeline: Craft's own `search` finds
-/// candidate documents (keyword/full-text, not semantic), then their content
-/// is fetched and handed to Claude (AnthropicClient, Haiku) along with the
-/// original question to extract the actual answer. Deliberately not a full
-/// embeddings/semantic-search system — see the design discussion this
-/// followed: with Brandon's content volume and near-daily growth, an
-/// indexing pipeline's upkeep cost wasn't worth it over this simpler
-/// search-then-synthesize approach.
+/// document it's buried in. Agentic retrieval: Claude drives its own lookup
+/// via tools (search_craft/list_subpages/read_document, all backed by
+/// CraftClient — see AnthropicClient.answer) instead of this view
+/// pre-guessing a fixed set of candidate documents and handing Claude
+/// whatever that guess picked. Deliberately not a full embeddings/semantic-
+/// search system — see the design discussion this followed: with Brandon's
+/// content volume and near-daily growth, an indexing pipeline's upkeep cost
+/// wasn't worth it over Claude doing targeted, bounded tool calls instead.
 ///
 /// Layout mirrors Quick Capture's Baserow section exactly, per Brandon's
 /// explicit spec: "Search" sits where "Database" does, the search field
@@ -120,42 +120,24 @@ struct SearchCraftView: View {
         let craft = CraftClient(url: store.config.craftLink)
         Task {
             do {
-                let results = try await craft.search(q)
-                guard !results.isEmpty else {
-                    errorMessage = "Nothing in Craft matched that."
-                    isSearching = false
-                    return
-                }
-                // Top 3, not just the first — Craft's search ranks by
-                // keyword-hit count, not by whether a result actually
-                // contains the answer, so a few candidates gives Claude a
-                // better shot at finding it. "From:" below still attributes
-                // to the top-ranked one as a reasonable approximation, even
-                // though the real answer could technically come from any of
-                // the three. Each result's own matched snippet is included
-                // too (in addition to the full page fetch below) since it's
-                // often the most directly relevant text in the whole page.
-                let topResults = Array(results.prefix(3))
-                var combined = ""
-                var titleById: [String: String] = [:]
-                for result in topResults {
-                    let title: String
-                    let content: String
-                    if let fetched = try? await craft.pageTitleAndMarkdown(rootBlockId: result.id) {
-                        title = fetched.title.isEmpty ? "Untitled" : fetched.title
-                        content = fetched.markdown
-                    } else {
-                        title = "Untitled"
-                        content = ""
-                    }
-                    titleById[result.id] = title
-                    combined += "### \(title)\nMatched excerpt: \(result.snippet)\n\(content)\n\n"
-                }
+                // Claude drives its own retrieval now (search_craft/
+                // list_subpages/read_document, all backed by `craft`) rather
+                // than answering from a fixed pre-guessed set of candidate
+                // documents — see AnthropicClient.answer's doc comment for
+                // why that fixed-guess approach was replaced.
                 let anthropic = AnthropicClient(apiKey: store.config.anthropicApiKey)
-                let response = try await anthropic.ask(question: q, context: combined)
-                answer = response
-                sourceTitle = topResults.first.flatMap { titleById[$0.id] }
-                sourceId = topResults.first?.id
+                let result = try await anthropic.answer(question: q, craft: craft)
+                // Claude's own final answer already says so in plain text
+                // when it genuinely couldn't find anything (per the system
+                // prompt) — this is just a defensive fallback for the
+                // degenerate case of a truly empty response.
+                if result.answer.isEmpty {
+                    errorMessage = "Nothing in Craft matched that."
+                } else {
+                    answer = result.answer
+                    sourceTitle = result.sourceTitle
+                    sourceId = result.sourceId
+                }
                 isSearching = false
             } catch {
                 errorMessage = error.localizedDescription

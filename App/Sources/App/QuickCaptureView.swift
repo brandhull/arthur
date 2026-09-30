@@ -106,10 +106,9 @@ struct QuickCaptureView: View {
 
     private func handleOnAppear() {
         documentStore.refreshIfStale(craftLink: store.config.craftLink)
-        if databaseId == nil, let lastDb = store.config.lastBaserowDatabaseId,
-           store.config.baserowDatabases.contains(where: { $0.id == lastDb }) {
-            databaseId = lastDb
-        }
+        // Deliberately no longer auto-restoring lastBaserowDatabaseId here —
+        // Brandon: opening this screen should always start at "Select a
+        // database", not silently pre-pick whatever he used last time.
     }
 
     /// Mac's sidebar sits right beside this card, so 8pt (Theme's shared
@@ -225,6 +224,18 @@ struct QuickCaptureView: View {
         .padding(.horizontal, 20)
         .padding(.top, 14)
         .padding(.bottom, isDestinationExpanded ? 0 : 14)
+        #if os(macOS)
+        // Mac-only, per Brandon's ask: when collapsed, the whole bar (not
+        // just the small chevron hit-target) expands it. The chevron
+        // button's own tap still consumes its own region and calls its own
+        // toggle action first, so this only ever fires for a click
+        // elsewhere on the bar — never double-toggles back to collapsed.
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard !isDestinationExpanded else { return }
+            withAnimation(.easeInOut(duration: 0.15)) { isDestinationExpanded = true }
+        }
+        #endif
     }
 
     // MARK: - Craft section (formerly CaptureSheet)

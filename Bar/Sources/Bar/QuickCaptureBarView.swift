@@ -78,7 +78,7 @@ struct QuickCaptureBarView: View {
         // grows/shrinks as Destination expands/collapses instead of staying
         // pinned to one fixed size.
         .fixedSize(horizontal: false, vertical: true)
-        .frame(width: 340)
+        .frame(width: 390)
         // Always dark — Brandon's explicit ask, no setting to change it.
         // ArthurBar never had an appearance toggle of its own; this
         // overrides whatever the system/main-app appearance happens to be.

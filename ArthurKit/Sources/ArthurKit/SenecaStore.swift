@@ -66,6 +66,11 @@ public actor SenecaStore {
     /// staleness-sorted rows.
     private static let candidatePoolSize = 30
 
+    /// Quotes longer than this are skipped entirely — keeps every picked
+    /// quote comfortably on one splash screen at the splash's 24pt serif
+    /// size, no scrolling/overflow. Approximate, not width-measured.
+    private static let maxQuoteLength = 300
+
     private var cacheURL: URL { Config.supportDir.appendingPathComponent("senecaCache.json") }
 
     private func loadCache() -> CacheFile {
@@ -126,7 +131,8 @@ public actor SenecaStore {
         let candidates = rows
             .compactMap { row -> (row: BaserowRow, lastShown: String)? in
                 guard let text = row.fields[quoteField] as? String,
-                      !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                      !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      text.count <= Self.maxQuoteLength
                 else { return nil }
                 let lastShown = lastShownField.flatMap { row.fields[$0] as? String } ?? ""
                 return (row, lastShown)

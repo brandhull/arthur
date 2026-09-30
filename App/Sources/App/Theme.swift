@@ -21,8 +21,9 @@ enum Theme {
     static let darkNavyBackground = baseColor
 
     /// Dark mode heading/button text — a light grey, not pure white, per
-    /// Brandon's request.
-    static let darkText = Color(red: 0.85, green: 0.85, blue: 0.87)
+    /// Brandon's request. #D3D3D3 (211/255 each channel) — matched to the
+    /// text color he settled on in Maverick's own recent readability pass.
+    static let darkText = Color(red: 211.0 / 255.0, green: 211.0 / 255.0, blue: 211.0 / 255.0)
 
     static let accentBright = Color(red: 0.357, green: 0.608, blue: 1.0)   // #5B9BFF, still used for the checkbox fill
     static let accentDim    = Color(red: 0.18, green: 0.30, blue: 0.47)
@@ -126,9 +127,15 @@ enum Theme {
     /// section labels don't need to stand out as much as the app's own
     /// title. "Add Task"/"Add to Daily Note"/"Quick Capture" are unaffected
     /// — those are native/large sheet titles, a different case entirely.
+    /// Mac matches `inputFontSize`'s 14pt exactly now — a lone 1pt
+    /// difference (15 vs 14) read as unintentional/sloppy rather than a
+    /// deliberate size step, per Brandon. Distinguished from body text by
+    /// weight alone on Mac now (see `headingWeight`); iOS/iPadOS keeps 20,
+    /// unaffected — there `inputFontSize` already equals this exactly, so
+    /// there was never a mismatch to fix.
     static var sectionHeadingSize: CGFloat {
         #if os(macOS)
-        return 15
+        return 14
         #else
         return 20
         #endif
