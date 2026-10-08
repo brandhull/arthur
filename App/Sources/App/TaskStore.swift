@@ -290,17 +290,19 @@ final class TaskStore: ObservableObject {
     }
 
     /// Replaces the whole daily note's content — Reflection's "Edit" flow,
-    /// as opposed to appendToDailyNote's "Add" flow above.
-    func saveDailyNote(_ newContent: String) {
+    /// as opposed to appendToDailyNote's "Add" flow above. Returns whether
+    /// the save went through, so the caller can keep the user's draft open
+    /// on failure instead of discarding it.
+    func saveDailyNote(_ newContent: String) async -> Bool {
         dailyNoteSaving = true
-        Task {
-            defer { dailyNoteSaving = false }
-            do {
-                try await client.replaceDailyNoteContent(day: "today", markdown: newContent)
-                dailyNoteContent = newContent
-            } catch {
-                errorMessage = error.localizedDescription
-            }
+        defer { dailyNoteSaving = false }
+        do {
+            try await client.replaceDailyNoteContent(day: "today", markdown: newContent)
+            dailyNoteContent = newContent
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -337,16 +339,17 @@ final class TaskStore: ObservableObject {
         }
     }
 
-    func saveRocks(_ newContent: String) {
+    /// Returns whether the save went through — see saveDailyNote.
+    func saveRocks(_ newContent: String) async -> Bool {
         rocksSaving = true
-        Task {
-            defer { rocksSaving = false }
-            do {
-                try await rocksDocumentOperation { try await client.replacePageContent(rootBlockId: $0, markdown: newContent) }
-                rocksContent = newContent
-            } catch {
-                errorMessage = error.localizedDescription
-            }
+        defer { rocksSaving = false }
+        do {
+            try await rocksDocumentOperation { try await client.replacePageContent(rootBlockId: $0, markdown: newContent) }
+            rocksContent = newContent
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
         }
     }
 

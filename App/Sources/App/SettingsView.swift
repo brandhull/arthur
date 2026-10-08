@@ -562,7 +562,13 @@ struct SettingsView: View {
         isLoadingSenecaTables = true
         defer { isLoadingSenecaTables = false }
         let client = BaserowClient(token: baserowToken)
-        let tables = (try? await client.listTables(databaseId: databaseId)) ?? []
+        // On a failed fetch (offline, bad token) leave the saved selection
+        // alone — an empty list from an error must not be mistaken for "this
+        // table no longer exists", or pressing Done would persist the wipe.
+        guard let tables = try? await client.listTables(databaseId: databaseId) else {
+            senecaTables = []
+            return
+        }
         senecaTables = tables
         // Only clear the selection if it doesn't belong to this database's
         // tables — preserves the restored senecaTableId from loadFromStore

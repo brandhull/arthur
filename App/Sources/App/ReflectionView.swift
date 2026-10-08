@@ -47,8 +47,9 @@ struct ReflectionView: View {
                 if isEditing {
                     PillActionButton(label: "Cancel", scheme: effectiveScheme) { isEditing = false }
                     PillActionButton(label: "Save", scheme: effectiveScheme) {
-                        store.saveDailyNote(draftContent)
-                        isEditing = false
+                        // Stay in edit mode if the save fails, so the
+                        // draft isn't thrown away.
+                        Task { if await store.saveDailyNote(draftContent) { isEditing = false } }
                     }
                 } else {
                     PillActionButton(label: "Edit", scheme: effectiveScheme) {

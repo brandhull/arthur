@@ -112,9 +112,11 @@ public actor SenecaStore {
     /// ever surfacing an error on what's meant to be a quiet, ambient
     /// screen.
     public func refillIfNeeded(config: Config) async {
-        let cache = loadCache()
-        let remaining = cache.quotes.count - cache.index - 1
-        guard remaining < Self.refillThreshold else { return }
+        // `index` always points at the next quote to show (advance() runs
+        // right after the splash reads currentQuote), so everything from
+        // `index` onward is still unshown.
+        let current = loadCache()
+        guard current.quotes.count - current.index < Self.refillThreshold else { return }
         guard config.isBaserowConfigured, let tableId = config.senecaTableId else { return }
 
         let client = BaserowClient(token: config.baserowToken)
@@ -128,6 +130,16 @@ public actor SenecaStore {
         // row's lastShown just ties at "", and the shuffle does the rest.
         let lastShownField = rows.first.flatMap { Self.resolveFieldName(Self.lastShownFieldName, among: $0.fields.keys) }
 
+        // Reloaded after the network call, not reused from before it — this
+        // actor re-enters at every `await`, so an advance() that ran while
+        // the request was in flight would otherwise be overwritten by a
+        // save built from the stale pre-request copy.
+        let cache = loadCache()
+        let unshown = cache.quotes.indices.contains(cache.index)
+            ? Array(cache.quotes[cache.index...])
+            : []
+        let bufferedIds = Set(unshown.map(\.id))
+
         let candidates = rows
             .compactMap { row -> (row: BaserowRow, lastShown: String)? in
                 guard let text = row.fields[quoteField] as? String,
@@ -139,7 +151,12 @@ public actor SenecaStore {
             }
             .sorted { $0.lastShown < $1.lastShown }
 
-        let pool = Array(candidates.prefix(Self.candidatePoolSize)).shuffled()
+        // Quotes already waiting in the buffer haven't been stamped "Last
+        // shown" yet, so they still look stale — skip them to avoid queueing
+        // the same quote twice. Falls back to the full list only when the
+        // table is too small to have anything else.
+        let notBuffered = candidates.filter { !bufferedIds.contains($0.row.id) }
+        let pool = Array((notBuffered.isEmpty ? candidates : notBuffered).prefix(Self.candidatePoolSize)).shuffled()
         let picked = Array(pool.prefix(Self.batchSize))
         guard !picked.isEmpty else { return }
 
@@ -151,12 +168,9 @@ public actor SenecaStore {
             )
         }
 
-        // Keep whatever's left unshown in the current buffer so a refill
-        // never cuts a quote off mid-rotation; append the fresh batch after
-        // it and reset the pointer to the start of that combined queue.
-        let unshown = cache.quotes.indices.contains(cache.index + 1)
-            ? Array(cache.quotes[(cache.index + 1)...])
-            : []
+        // Keep the still-unshown quotes ahead of the fresh batch so a refill
+        // never cuts a quote off mid-rotation, and reset the pointer to the
+        // start of that combined queue.
         saveCache(CacheFile(quotes: unshown + freshQuotes, index: 0))
     }
 

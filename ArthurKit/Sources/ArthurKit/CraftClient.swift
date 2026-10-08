@@ -426,31 +426,36 @@ public struct CraftClient {
     /// "Edit" flow. There's no single "replace all" API call: `blocks
     /// update` only replaces one existing block and would leave stale
     /// leftover blocks behind if the edited text has fewer blocks than
-    /// before, so this deletes every existing child block first, then adds
-    /// the new text fresh. More round-trips than a single call, but
-    /// correct regardless of how the block count changed.
+    /// before. So this adds the new text first and only then deletes the
+    /// blocks that were there before (captured up front by id). If the add
+    /// fails, the old content is untouched; if a delete fails partway, the
+    /// worst case is leftover old blocks above the new text, not lost text.
     public func replacePageContent(rootBlockId: String, markdown: String) async throws {
         let existing = try await pageBlocks(rootBlockId: rootBlockId)
-        for block in existing {
-            _ = try await call(tool: "craft_write", command: "blocks delete --id \(block.id)")
-        }
         let trimmed = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        try await appendBlocks(pageId: rootBlockId, markdown: trimmed)
+        if !trimmed.isEmpty {
+            try await appendBlocks(pageId: rootBlockId, markdown: trimmed)
+        }
+        try await deleteBlocks(existing)
     }
 
     /// Same as `replacePageContent`, but for the daily note — used by
     /// Reflection's "Edit" flow. The add step reuses `appendBlocksToDailyNote`
     /// (date-keyed, no id needed); only the delete step needs each existing
-    /// block's own id.
+    /// block's own id. Same add-before-delete ordering, for the same reason.
     public func replaceDailyNoteContent(day: String, markdown: String) async throws {
         let existing = try await dailyNoteBlocks(day: day)
-        for block in existing {
+        let trimmed = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            try await appendBlocksToDailyNote(day: day, markdown: trimmed)
+        }
+        try await deleteBlocks(existing)
+    }
+
+    private func deleteBlocks(_ blocks: [CraftBlock]) async throws {
+        for block in blocks {
             _ = try await call(tool: "craft_write", command: "blocks delete --id \(block.id)")
         }
-        let trimmed = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        try await appendBlocksToDailyNote(day: day, markdown: trimmed)
     }
 
     // MARK: - Documents (inbox destinations)
