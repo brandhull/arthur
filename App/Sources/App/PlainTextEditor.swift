@@ -44,16 +44,32 @@ import SwiftUI
 /// cursor still visible/advancing, still able to type, but no glyphs) — see
 /// the markedTextRange guard in UITextViewBridge.updateUIView for the root
 /// cause and fix.
-/// Shared by both platform bridges below — detects a "- "/"* " bullet marker
-/// at the start of a line (any leading whitespace/tabs preserved as part of
-/// the marker, so a nested/indented bullet's Return continues at the same
-/// indent). Plain string logic, no platform text types, so both the AppKit
-/// and UIKit bridges can call the same thing instead of drifting apart.
+/// Shared by both platform bridges below — detects a list marker at the
+/// start of a line: "- "/"* " bullets or "1. "-style numbers (any leading
+/// whitespace/tabs preserved as part of the marker, so a nested/indented
+/// item's Return continues at the same indent). Plain string logic, no
+/// platform text types, so both the AppKit and UIKit bridges can call the
+/// same thing instead of drifting apart.
 private func bulletMarker(in line: String) -> String? {
     let leading = line.prefix { $0 == " " || $0 == "\t" }
     let rest = line[leading.endIndex...]
-    guard rest.hasPrefix("- ") || rest.hasPrefix("* ") else { return nil }
-    return String(leading) + rest.prefix(2)
+    if rest.hasPrefix("- ") || rest.hasPrefix("* ") {
+        return String(leading) + rest.prefix(2)
+    }
+    let digits = rest.prefix { $0.isASCII && $0.isNumber }
+    if !digits.isEmpty, digits.count <= 9, rest[digits.endIndex...].hasPrefix(". ") {
+        return String(leading) + digits + ". "
+    }
+    return nil
+}
+
+/// The marker the next line should start with: a numbered marker counts up
+/// ("1. " -> "2. "), bullets repeat as-is.
+private func continuedMarker(_ marker: String) -> String {
+    let leading = marker.prefix { $0 == " " || $0 == "\t" }
+    let rest = marker[leading.endIndex...]
+    guard let n = Int(rest.dropLast(2)), rest.hasSuffix(". ") else { return marker }
+    return String(leading) + "\(n + 1). "
 }
 
 struct PlainTextEditor: View {
@@ -195,7 +211,7 @@ private struct UITextViewBridge: UIViewRepresentable {
                 storage.replaceCharacters(in: contentRange, with: "")
                 textView.selectedRange = NSRange(location: contentRange.location, length: 0)
             } else {
-                let insertion = "\n" + marker
+                let insertion = "\n" + continuedMarker(marker)
                 storage.replaceCharacters(in: range, with: insertion)
                 textView.selectedRange = NSRange(location: range.location + (insertion as NSString).length, length: 0)
             }
@@ -332,7 +348,7 @@ private struct NSTextViewBridge: NSViewRepresentable {
             if afterMarker.trimmingCharacters(in: .whitespaces).isEmpty {
                 textView.insertText("", replacementRange: contentRange)
             } else {
-                textView.insertText("\n" + marker, replacementRange: selRange)
+                textView.insertText("\n" + continuedMarker(marker), replacementRange: selRange)
             }
             text.wrappedValue = textView.string
             NSTextViewBridge.applyBulletIndent(textView)
