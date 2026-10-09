@@ -243,6 +243,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeys.target = self
         menu.addItem(hotkeys)
         menu.addItem(.separator())
+        let version = NSMenuItem(title: "Arthur Bar \(AppVersion.display)", action: nil, keyEquivalent: "")
+        version.isEnabled = false
+        menu.addItem(version)
         menu.addItem(NSMenuItem(title: "Quit Arthur Bar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         return menu
     }

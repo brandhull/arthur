@@ -509,6 +509,12 @@ struct SettingsView: View {
                         .padding(.horizontal, 20)
                         .padding(.top, hasDebugLog ? 8 : 0)
                     }
+
+                    Text("Arthur \(AppVersion.display)")
+                        .font(.caption)
+                        .foregroundStyle(Theme.secondaryText(effectiveScheme))
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 24)
                 }
                 .padding(.bottom, 16)
             }
