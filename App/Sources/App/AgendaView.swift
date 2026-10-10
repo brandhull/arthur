@@ -127,7 +127,7 @@ struct AgendaView: View {
         // flip this same showingQuickAdd flag now instead of each anchoring
         // its own popover in a different spot with different fonts.
         .overlay {
-            CenteredModal(isPresented: $showingQuickAdd, effectiveScheme: effectiveScheme) {
+            CenteredModal(isPresented: $showingQuickAdd, effectiveScheme: effectiveScheme, anchor: quickAddAnchor) {
                 QuickAddModal(
                     store: store, selectedTab: $selectedTab,
                     showingAddTask: $showingAddTask, showingDocumentCapture: $showingDocumentCapture,
@@ -222,6 +222,17 @@ struct AgendaView: View {
     /// its visibility directly (not selectedTab, since Document has no
     /// HomeTab case of its own); picking any real sidebar/drawer
     /// destination while it's showing dismisses it via the onChange below.
+    /// The corner the quick-add card grows out of: toward the floating button
+    /// on iPhone (bottom right), toward the sidebar button on Mac (top
+    /// left), and the top edge on iPad, where the button sits in the top bar.
+    private var quickAddAnchor: UnitPoint {
+        #if os(iOS)
+        return horizontalSizeClass == .compact ? .bottomTrailing : .top
+        #else
+        return .topLeading
+        #endif
+    }
+
     private var tabContent: some View {
         ZStack {
             RocksView(store: store)

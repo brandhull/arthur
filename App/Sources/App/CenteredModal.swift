@@ -19,52 +19,66 @@ import ArthurKit
 struct CenteredModal<Content: View>: View {
     @Binding var isPresented: Bool
     let effectiveScheme: ColorScheme
+    /// Which corner of the card the open/close animation grows from and
+    /// shrinks back into — set to the side the triggering button lives on
+    /// so the card reads as emerging from it, like the "+" menu in Messages.
+    var anchor: UnitPoint = .center
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        if isPresented {
-            ZStack {
+        // The container is always in the tree and the animation is attached
+        // out here, outside the `if` — the earlier version put `.animation`
+        // on the conditional content itself, so it was removed from the
+        // hierarchy before a closing animation could play and opened with
+        // only a faint fade.
+        ZStack {
+            if isPresented {
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()
                     .onTapGesture { isPresented = false }
+                    .transition(.opacity)
 
-                VStack(spacing: 0) {
-                    HStack {
-                        Spacer()
-                        Button {
-                            isPresented = false
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Theme.secondaryText(effectiveScheme))
-                                .frame(width: 28, height: 28)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.top, 6)
-                    .padding(.trailing, 6)
-
-                    content()
-                }
-                .background(
-                    RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
-                        .fill(Theme.sidebarCardBackground(effectiveScheme))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
-                        .stroke(Theme.primary(effectiveScheme).opacity(Theme.borderOpacity), lineWidth: Theme.borderWidth)
-                )
-                // One fixed width for both of QuickAddModal's modes (menu
-                // and the inline New Reflection compose box) — part of
-                // making this read as one consistent modal rather than
-                // resizing itself between two different widths depending on
-                // what's showing.
-                .frame(width: 300)
-                .shadow(color: Color.black.opacity(0.25), radius: 24, y: 10)
+                card
+                    .transition(.scale(scale: 0.6, anchor: anchor).combined(with: .opacity))
             }
-            .transition(.opacity.combined(with: .scale(scale: 0.96)))
-            .animation(.easeOut(duration: 0.15), value: isPresented)
         }
+        .animation(.snappy(duration: 0.3, extraBounce: 0.08), value: isPresented)
+    }
+
+    private var card: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button {
+                    isPresented = false
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.secondaryText(effectiveScheme))
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.top, 6)
+            .padding(.trailing, 6)
+
+            content()
+        }
+        .background(
+            RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
+                .fill(Theme.sidebarCardBackground(effectiveScheme))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
+                .stroke(Theme.primary(effectiveScheme).opacity(Theme.borderOpacity), lineWidth: Theme.borderWidth)
+        )
+        // One fixed width for both of QuickAddModal's modes (menu
+        // and the inline New Reflection compose box) — part of
+        // making this read as one consistent modal rather than
+        // resizing itself between two different widths depending on
+        // what's showing.
+        .frame(width: 300)
+        .shadow(color: Color.black.opacity(0.25), radius: 24, y: 10)
     }
 }

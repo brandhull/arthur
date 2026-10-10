@@ -64,42 +64,42 @@ struct QuickAddModal: View {
 
     private var menuBody: some View {
         VStack(alignment: .leading, spacing: 0) {
-            quickAddRow(title: "Task", systemImage: "checkmark.circle") {
+            quickAddRow(title: "Task") {
                 isPresented = false
                 showingAddTask = true
             }
             Divider()
-            quickAddRow(title: "Quick Capture", systemImage: "bolt") {
+            quickAddRow(title: "Quick Capture") {
                 isPresented = false
                 selectedTab = .quickCapture
             }
             Divider()
-            quickAddRow(title: "Bits", systemImage: "text.badge.plus") {
+            quickAddRow(title: "Bits") {
                 isPresented = false
                 showingBitCapture = true
             }
             Divider()
-            quickAddRow(title: "Document", systemImage: "doc.badge.plus") {
+            quickAddRow(title: "Document") {
                 isPresented = false
                 showingDocumentCapture = true
             }
             Divider()
-            quickAddRow(title: "Reflection", systemImage: "moon.stars") {
+            quickAddRow(title: "Reflection") {
                 mode = .reflection
             }
         }
-        .padding(.vertical, 6)
+        .padding(.top, 2)
+        .padding(.bottom, 8)
     }
 
-    private func quickAddRow(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+    private func quickAddRow(title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: systemImage).frame(width: 18)
+            HStack {
                 Text(title).font(.system(size: Theme.inputFontSize()))
                 Spacer()
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
