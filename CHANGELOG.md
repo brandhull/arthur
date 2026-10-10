@@ -5,6 +5,20 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-10
+
+### Changed
+- New Reflection (from the New menu) is now a full capture screen like New
+  Bit and New Document, instead of a small popup. Saving appends to today's
+  note and shows the Reflection tab.
+- The new-Document screen shows Save as a plain bottom-right button once
+  there's a title and a chosen folder, and its error messages show even while
+  the Destination card is collapsed.
+- The iPhone's floating "new" button hides on every capture screen.
+
+### Removed
+- Search Craft: the tab, its Anthropic API key setting, and all its code.
+
 ## [1.1.3] - 2026-10-10
 
 ### Changed
