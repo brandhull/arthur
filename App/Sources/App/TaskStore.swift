@@ -43,7 +43,9 @@ final class TaskStore: ObservableObject {
             forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
-            self?.reloadConfig()
+            // The closure is nonisolated even though it runs on the main
+            // queue, so hop onto the main actor explicitly.
+            Task { @MainActor in self?.reloadConfig() }
         }
     }
 

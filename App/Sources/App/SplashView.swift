@@ -75,10 +75,11 @@ struct SplashView: View {
             await SenecaStore.shared.advance()
 
             withAnimation(.easeInOut(duration: 0.5)) { opacity = 1 }
-            // 4.1s hold — combined with the 0.5s fade-in and 0.4s fade-out
-            // below, the quote is actually on screen for ~5s total, per
-            // Brandon's request to have enough time to read a longer quote.
-            try? await Task.sleep(nanoseconds: 4_100_000_000)
+            // 8.68s hold — combined with the 0.5s fade-in, 0.4s fade-out,
+            // and the 0.42s post-fade pause below, the splash's total
+            // programmatic duration is ~10s, bumped up from ~5s per
+            // Brandon's request.
+            try? await Task.sleep(nanoseconds: 8_680_000_000)
             withAnimation(.easeInOut(duration: 0.4)) { opacity = 0 }
             try? await Task.sleep(nanoseconds: 420_000_000)
 
