@@ -5,6 +5,21 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-10
+
+### Changed
+- The splash screen holds for about 10 seconds instead of 5.
+
+### Fixed
+- ArthurBar's Quick Task and Quick Capture hotkeys each open their own panel
+  (both used to open Quick Capture).
+- Seneca now reads every row in the table, not just the first 200.
+- Error messages in Quick Capture, Quick Task, and ArthurBar's Quick Capture
+  clear when you try again, instead of lingering after a later success.
+- Document capture no longer creates a duplicate page when a retry follows a
+  failed body save, and its folder list refreshes each time it's opened
+  instead of loading once per app run.
+
 ## [1.0.0] - 2026-10-08
 
 First versioned release; a baseline of everything built so far.
