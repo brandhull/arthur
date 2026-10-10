@@ -5,6 +5,13 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-10-10
+
+### Changed
+- The new-Bit capture screen only shows Save once there's text, as a plain
+  button without a surrounding box; the iPhone's floating "new" button hides
+  while it's open.
+
 ## [1.1.1] - 2026-10-10
 
 ### Fixed
