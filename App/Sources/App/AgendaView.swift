@@ -10,16 +10,14 @@ import ArthurKit
 /// wasn't using it at all — he's spinning Baserow browsing out into its own
 /// separate app instead. Quick Capture's own Craft/Baserow toggle (pushing
 /// a row into a table) is unrelated and stays; only that standalone
-/// search-and-browse tab was gone. Search Craft is a different thing
-/// entirely — natural-language Q&A over Craft content via CraftClient.search
-/// + AnthropicClient, not a browse-and-pick-a-destination tool.
+/// search-and-browse tab was gone. (A "Search Craft" Q&A tab existed too, and
+/// was removed in 1.2.0.)
 enum HomeTab: String, CaseIterable, Identifiable {
     case rocks = "Rocks"
     case bits = "Bits"
     case tasks = "Tasks"
     case quickCapture = "Quick Capture"
     case reflection = "Reflection"
-    case searchCraft = "Search Craft"
     var id: String { rawValue }
 }
 
@@ -42,6 +40,9 @@ struct AgendaView: View {
     // reachable only via the quick-add popup's Bits row. Same embedded-layer
     // treatment as Document.
     @State private var showingBitCapture = false
+    // "Reflection" quick-add flow — a blank capture screen that appends to
+    // today's daily note.
+    @State private var showingReflectionCapture = false
     // Shared by iPhone's floating quick-add button and iPad's top-bar/
     // sidebar quick-add button — only one of the three is ever actually
     // mounted at a time depending on device/orientation, so one Bool is
@@ -131,7 +132,7 @@ struct AgendaView: View {
                 QuickAddModal(
                     store: store, selectedTab: $selectedTab,
                     showingAddTask: $showingAddTask, showingDocumentCapture: $showingDocumentCapture,
-                    showingBitCapture: $showingBitCapture,
+                    showingBitCapture: $showingBitCapture, showingReflectionCapture: $showingReflectionCapture,
                     isPresented: $showingQuickAdd
                 )
             }
@@ -258,18 +259,30 @@ struct AgendaView: View {
                 .opacity(selectedTab == .reflection && !coverShowing ? 1 : 0)
                 .allowsHitTesting(selectedTab == .reflection && !coverShowing)
                 .disabled(!(selectedTab == .reflection && !coverShowing))
-            SearchCraftView(store: store)
-                .opacity(selectedTab == .searchCraft && !coverShowing ? 1 : 0)
-                .allowsHitTesting(selectedTab == .searchCraft && !coverShowing)
-                .disabled(!(selectedTab == .searchCraft && !coverShowing))
             DocumentCaptureSheet(store: store, isPresented: $showingDocumentCapture)
                 .opacity(showingDocumentCapture ? 1 : 0)
                 .allowsHitTesting(showingDocumentCapture)
                 .disabled(!(showingDocumentCapture))
-            BitCaptureView(store: store, bits: bits, isPresented: $showingBitCapture, selectedTab: $selectedTab)
+            TextCaptureView(
+                store: store, isPresented: $showingBitCapture,
+                save: { text in
+                    guard store.config.isBitsConfigured else { return "Choose your Bits table in Settings." }
+                    return await bits.add(text: text, config: store.config)
+                        ? nil : (bits.errorMessage ?? "Couldn’t save that Bit.")
+                },
+                onSaved: { selectedTab = .bits }
+            )
                 .opacity(showingBitCapture ? 1 : 0)
                 .allowsHitTesting(showingBitCapture)
                 .disabled(!(showingBitCapture))
+            TextCaptureView(
+                store: store, isPresented: $showingReflectionCapture,
+                save: { text in await store.appendToDailyNote(text) },
+                onSaved: { selectedTab = .reflection }
+            )
+                .opacity(showingReflectionCapture ? 1 : 0)
+                .allowsHitTesting(showingReflectionCapture)
+                .disabled(!(showingReflectionCapture))
         }
         // Picking any real destination while Document is showing dismisses
         // it, the same way selecting any other tab always shows that tab —
@@ -278,19 +291,20 @@ struct AgendaView: View {
         // to). Doesn't cover re-tapping whatever tab was already selected
         // underneath (onChange only fires on an actual value change) — the
         // X button in Document itself is the fallback for that.
-        .onChange(of: selectedTab) { showingDocumentCapture = false; showingBitCapture = false }
-        .onChange(of: quickCaptureSource) { showingDocumentCapture = false; showingBitCapture = false }
+        .onChange(of: selectedTab) { showingDocumentCapture = false; showingBitCapture = false; showingReflectionCapture = false }
+        .onChange(of: quickCaptureSource) { showingDocumentCapture = false; showingBitCapture = false; showingReflectionCapture = false }
     }
 
-    /// Document and Bits capture are full-pane layers over whichever tab is
+    /// Document, Bits and Reflection capture are full-pane layers over whichever tab is
     /// selected; while either shows, every real tab is hidden.
-    private var coverShowing: Bool { showingDocumentCapture || showingBitCapture }
+    private var coverShowing: Bool { showingDocumentCapture || showingBitCapture || showingReflectionCapture }
 
     #if os(iOS)
     private var isFloatingButtonHidden: Bool {
         (selectedTab == .quickCapture && quickCaptureSource == .craft && isDestinationExpanded)
-            // Bit capture's Save button sits where this floating button does.
-            || showingBitCapture
+            // Every capture screen's Save button sits where this floating
+            // button does.
+            || coverShowing
     }
 
     /// iPhone-only floating quick-add button (iPad uses a non-floating

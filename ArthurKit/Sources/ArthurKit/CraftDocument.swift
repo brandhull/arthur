@@ -27,18 +27,3 @@ public struct CraftFolder: Identifiable, Hashable {
         self.name = name
     }
 }
-
-/// One match from CraftClient.search — "Search Craft"'s retrieval step.
-/// No title: Craft's real `search` response (confirmed live 2026-09-12)
-/// gives back `Document <uuid>` / `Blocks: <uuid>` / a `Match:` text
-/// snippet, never a title — the title is fetched separately, per result,
-/// via `pageTitleAndMarkdown` once a candidate document is chosen.
-public struct CraftSearchResult: Identifiable, Hashable {
-    public let id: String      // documentId (rootBlockId), usable with pageMarkdown/clickableLink
-    public let snippet: String // the matched block's text, as Craft returned it (bold markers stripped)
-
-    public init(id: String, snippet: String) {
-        self.id = id
-        self.snippet = snippet
-    }
-}

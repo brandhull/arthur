@@ -276,19 +276,19 @@ final class TaskStore: ObservableObject {
 
     /// Appends `text` to today's note (the "Add" button flow), then reloads
     /// the displayed content so it reflects what's actually in Craft.
-    func appendToDailyNote(_ text: String) {
+    func appendToDailyNote(_ text: String) async -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, config.isConfigured else { return }
+        guard !trimmed.isEmpty else { return nil }
+        guard config.isConfigured else { return CraftError.notConfigured.localizedDescription }
         dailyNoteSaving = true
-        Task {
-            defer { dailyNoteSaving = false }
-            do {
-                try await client.appendBlocksToDailyNote(day: "today", markdown: text)
-                await loadDailyNote()
-            } catch {
-                errorMessage = error.localizedDescription
-            }
+        defer { dailyNoteSaving = false }
+        do {
+            try await client.appendBlocksToDailyNote(day: "today", markdown: trimmed)
+        } catch {
+            return error.localizedDescription
         }
+        await loadDailyNote()
+        return nil
     }
 
     /// Replaces the whole daily note's content — Reflection's "Edit" flow,

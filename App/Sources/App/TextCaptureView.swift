@@ -1,18 +1,21 @@
 import SwiftUI
 import ArthurKit
 
-/// The "Bits" quick-add flow — the same blank capture screen as Quick
-/// Capture's Craft mode (a big text box filling the pane), except there's no
-/// destination to pick, so Save is just a button that appears at the bottom
-/// right once there's something to save. Embedded as an
-/// opacity-swapped layer in AgendaView's tabContent, same as
-/// DocumentCaptureSheet, so the sidebar/hamburger stays reachable. Saving
-/// closes this and switches to the Bits tab, where the new Bit is on top.
-struct BitCaptureView: View {
+/// The blank capture screen behind the New menu's Bits and Reflection rows —
+/// the same screen as Quick Capture's Craft mode (a big text box filling the
+/// pane), except there's no destination to pick, so Save is just a button at
+/// the bottom right that appears once there's something to save. Embedded as
+/// an opacity-swapped layer in AgendaView's tabContent, same as
+/// DocumentCaptureSheet, so the sidebar/hamburger stays reachable.
+///
+/// What "save" means is up to the caller: `save` returns nil on success or an
+/// error message, and `onSaved` then runs (e.g. switch to the tab that shows
+/// the result) before this closes itself.
+struct TextCaptureView: View {
     @ObservedObject var store: TaskStore
-    @ObservedObject var bits: BitsStore
     @Binding var isPresented: Bool
-    @Binding var selectedTab: HomeTab
+    let save: (String) async -> String?
+    let onSaved: () -> Void
     @Environment(\.colorScheme) private var systemScheme
 
     @State private var text = ""
@@ -60,7 +63,7 @@ struct BitCaptureView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     if hasText {
-                        PillButton(systemImage: "arrow.up.circle", label: isSaving ? "Saving…" : "Save", action: save)
+                        PillButton(systemImage: "arrow.up.circle", label: isSaving ? "Saving…" : "Save", action: submit)
                             .disabled(isSaving)
                     }
                 }
@@ -87,23 +90,19 @@ struct BitCaptureView: View {
         }
     }
 
-    private func save() {
-        guard store.config.isBitsConfigured else {
-            errorMessage = "Choose your Bits table in Settings."
-            return
-        }
+    private func submit() {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         isSaving = true
         errorMessage = nil
         Task {
-            let ok = await bits.add(text: trimmed, config: store.config)
+            let failure = await save(trimmed)
             isSaving = false
-            if ok {
-                text = ""
-                selectedTab = .bits
-                isPresented = false
+            if let failure {
+                errorMessage = failure
             } else {
-                errorMessage = bits.errorMessage
+                text = ""
+                onSaved()
+                isPresented = false
             }
         }
     }

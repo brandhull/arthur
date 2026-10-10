@@ -1,8 +1,8 @@
 import SwiftUI
 import ArthurKit
 
-/// The 8-row nav list (Rocks, Bits, Tasks, "Quick Capture" label + nested Craft/
-/// Baserow rows, Reflection, Search Craft) plus the bottom-pinned Settings
+/// The nav list (Rocks, Bits, Tasks, "Quick Capture" label + nested Craft/
+/// Baserow rows, Reflection) plus the bottom-pinned Settings
 /// gear row —
 /// extracted out of Mac's SidebarView so the exact same nav content can be
 /// reused by the iOS drawer (iPhone/iPad portrait) and the iPad landscape
@@ -89,9 +89,6 @@ struct SidebarNavList: View {
 
                 navRow(title: HomeTab.reflection.rawValue, isActive: selectedTab == .reflection) {
                     selectedTab = .reflection
-                }
-                navRow(title: HomeTab.searchCraft.rawValue, isActive: selectedTab == .searchCraft) {
-                    selectedTab = .searchCraft
                 }
             }
             .padding(.top, 4)

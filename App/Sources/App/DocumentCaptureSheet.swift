@@ -20,6 +20,11 @@ import ArthurKit
 /// all" — MacAgendaLayout/iOSAgendaLayout's own chrome already wraps
 /// tabContent, so embedding here inherits it for free.
 ///
+/// Save is a plain button at the bottom right that appears only once there's
+/// a title and a chosen folder (like the Bits/Reflection capture screens),
+/// outside the Destination card; errors show beside it so they're visible
+/// even while the card is collapsed.
+///
 /// No "Add Separator" toggle here — that only makes sense when appending
 /// onto existing content, which this never does. The new page's title is
 /// the capture box's first line, trimmed and excluded from the body pushed
@@ -87,8 +92,8 @@ struct DocumentCaptureSheet: View {
         return (title, body)
     }
 
-    private var isSubmitDisabled: Bool {
-        titleAndBody.title.isEmpty || selectedFolder == nil || isSubmitting
+    private var canShowSave: Bool {
+        !titleAndBody.title.isEmpty && selectedFolder != nil
     }
 
     /// Fetched every time Document capture is shown (see the onChange on
@@ -172,7 +177,25 @@ struct DocumentCaptureSheet: View {
             .padding(.horizontal, destinationCardHorizontalInset)
             .padding(.bottom, Theme.sidebarCardInset)
             .frame(maxHeight: isDestinationExpanded ? 280 : nil)
+
+            if canShowSave || errorMessage != nil {
+                VStack(alignment: .trailing, spacing: 8) {
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .foregroundStyle(.red)
+                            .font(.caption)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if canShowSave {
+                        PillButton(systemImage: "arrow.up.circle", label: isSubmitting ? "Saving…" : "Save", action: submit)
+                            .disabled(isSubmitting)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 16)
+            }
         }
+        .animation(.easeInOut(duration: 0.15), value: canShowSave)
         .foregroundStyle(Theme.primary(effectiveScheme))
         .background(Theme.background(effectiveScheme))
         .overlay(alignment: .topTrailing) {
@@ -304,21 +327,5 @@ struct DocumentCaptureSheet: View {
                 }
             }
         }
-
-        if let errorMessage {
-            Text(errorMessage)
-                .foregroundStyle(.red)
-                .font(.caption)
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-        }
-
-        HStack {
-            Spacer()
-            PillButton(systemImage: "arrow.up.circle", label: isSubmitting ? "Saving…" : "Save", action: submit)
-                .disabled(isSubmitDisabled)
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
     }
 }

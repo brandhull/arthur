@@ -1,65 +1,33 @@
 import SwiftUI
 import ArthurKit
 
-/// The bubble.and.pencil quick-add popup's content. Five options: Task
-/// (opens AddTaskSheet unchanged), Quick Capture (just switches the
-/// selected tab), Bits (opens BitCaptureView — a blank capture screen that
-/// saves a new Bit), Document (opens DocumentCaptureSheet — a new Craft page
-/// in a chosen folder, not part of the sidebar nav yet), and Reflection,
-/// which — per Brandon's explicit call — doesn't navigate anywhere: the
-/// modal transitions in place to a small inline compose box that appends
-/// straight to today's daily note, reusing DailyNoteComposeBox (the same
-/// view AddNoteSheet uses) rather than a second copy of that placeholder/
-/// PlainTextEditor logic. Row labels dropped their "New " prefix per
-/// Brandon's ask — "I know what I'm doing when I activate it."
+/// The bubble.and.pencil quick-add popup's content: a plain list of five
+/// rows. Task opens AddTaskSheet; Quick Capture just switches the selected
+/// tab; Bits, Reflection and Document each open a full capture screen
+/// embedded in AgendaView's tabContent (TextCaptureView / DocumentCaptureSheet)
+/// rather than anything inside this popup.
 ///
-/// Platform-neutral — nothing in here is actually Mac-specific, and no more
-/// platform-split font sizes: every size here is Theme.inputFontSize(),
-/// each platform's own already-standardized default. Pure content only —
-/// CenteredModal (mounted once at AgendaView's top level, identical on
-/// every platform) owns the outer card's frame/background/border/close
-/// button, which is what makes this look the same everywhere now instead of
-/// the mismatched Mac-popover/iPad-popover/iPhone-bottom-sheet chrome it
-/// used to render inside.
+/// Platform-neutral — every size here is Theme.inputFontSize(). Pure content
+/// only — CenteredModal (mounted once at AgendaView's top level, identical on
+/// every platform) owns the outer card's frame, background, border and close
+/// button.
 struct QuickAddModal: View {
     @ObservedObject var store: TaskStore
     @Binding var selectedTab: HomeTab
     @Binding var showingAddTask: Bool
     @Binding var showingDocumentCapture: Bool
     @Binding var showingBitCapture: Bool
+    @Binding var showingReflectionCapture: Bool
     @Binding var isPresented: Bool
     @Environment(\.colorScheme) private var systemScheme
-
-    private enum Mode {
-        case menu
-        case reflection
-    }
-
-    @State private var mode: Mode = .menu
-    @State private var reflectionText = ""
 
     private var effectiveScheme: ColorScheme {
         Theme.effectiveScheme(appearance: store.config.appearance, system: systemScheme)
     }
 
     var body: some View {
-        Group {
-            switch mode {
-            case .menu: menuBody
-            case .reflection: reflectionBody
-            }
-        }
-        .foregroundStyle(Theme.primary(effectiveScheme))
-        // Reset back to the menu each time the modal is reopened, rather
-        // than reopening mid-compose from a previous visit — quick-add is
-        // meant to be a fast one-shot action, not a place to leave drafts
-        // sitting around unlike Quick Capture's own tab.
-        .onChange(of: isPresented) {
-            if isPresented {
-                mode = .menu
-                reflectionText = ""
-            }
-        }
+        menuBody
+            .foregroundStyle(Theme.primary(effectiveScheme))
     }
 
     private var menuBody: some View {
@@ -85,7 +53,8 @@ struct QuickAddModal: View {
             }
             Divider()
             quickAddRow(title: "Reflection") {
-                mode = .reflection
+                isPresented = false
+                showingReflectionCapture = true
             }
         }
         .padding(.top, 2)
@@ -103,29 +72,5 @@ struct QuickAddModal: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-
-    private var reflectionBody: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Reflection")
-                .font(.system(size: Theme.inputFontSize(), weight: .semibold))
-                .padding(.horizontal, 14)
-            DailyNoteComposeBox(
-                store: store, text: $reflectionText,
-                effectiveScheme: effectiveScheme, inputFontSize: Theme.inputFontSize(), bordered: false
-            )
-            .frame(height: 140)
-            .padding(.horizontal, 14)
-            HStack {
-                Spacer()
-                PillButton(systemImage: "arrow.up.circle", label: "Add") {
-                    store.appendToDailyNote(reflectionText)
-                    isPresented = false
-                }
-                .disabled(reflectionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-            .padding(.horizontal, 14)
-        }
-        .padding(.vertical, 14)
     }
 }

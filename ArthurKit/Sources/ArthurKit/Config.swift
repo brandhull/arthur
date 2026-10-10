@@ -40,12 +40,6 @@ public struct Config: Codable {
     public var craftLink: String
     public var inboxes: [InboxDestination]
     public var defaultInboxId: String?
-    /// Backs "Search Craft" — a separate credential from craftLink (that's
-    /// an MCP link, this is a real Anthropic API key) used for the
-    /// answer-synthesis step: Craft's own search finds candidate
-    /// documents/blocks, then this key lets Arthur ask Claude to pull the
-    /// actual answer out of their content.
-    public var anthropicApiKey: String
     public var baserowToken: String
     public var baserowDatabases: [BaserowDatabase]
     public var lastBaserowDatabaseId: Int?
@@ -78,7 +72,6 @@ public struct Config: Codable {
 
     public init(craftLink: String = "", inboxes: [InboxDestination] = [],
                 defaultInboxId: String? = nil,
-                anthropicApiKey: String = "",
                 baserowToken: String = "",
                 baserowDatabases: [BaserowDatabase] = [],
                 lastBaserowDatabaseId: Int? = nil, lastBaserowTableId: Int? = nil,
@@ -90,7 +83,6 @@ public struct Config: Codable {
         self.craftLink = craftLink
         self.inboxes = inboxes
         self.defaultInboxId = defaultInboxId
-        self.anthropicApiKey = anthropicApiKey
         self.baserowToken = baserowToken
         self.baserowDatabases = baserowDatabases
         self.lastBaserowDatabaseId = lastBaserowDatabaseId
@@ -118,7 +110,6 @@ public struct Config: Codable {
         // appearance intentionally NOT decoded here — see the computed
         // property below, which is why it's excluded from CodingKeys/this
         // custom decoder entirely.
-        anthropicApiKey = try c.decodeIfPresent(String.self, forKey: .anthropicApiKey) ?? ""
         baserowToken = try c.decodeIfPresent(String.self, forKey: .baserowToken) ?? ""
         baserowDatabases = try c.decodeIfPresent([BaserowDatabase].self, forKey: .baserowDatabases) ?? []
         lastBaserowDatabaseId = try c.decodeIfPresent(Int.self, forKey: .lastBaserowDatabaseId)
@@ -287,5 +278,4 @@ public struct Config: Codable {
 
     public var isBitsConfigured: Bool { isBaserowConfigured && bitsTableId != nil }
 
-    public var isAnthropicConfigured: Bool { !anthropicApiKey.isEmpty }
 }
