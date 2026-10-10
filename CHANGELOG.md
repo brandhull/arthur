@@ -5,6 +5,12 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-10-10
+
+### Fixed
+- The Mac cursor no longer turns into a text I-beam over cards and buttons
+  when a hidden screen's text editor sits underneath.
+
 ## [1.1.0] - 2026-10-10
 
 ### Added
