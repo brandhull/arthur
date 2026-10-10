@@ -5,6 +5,14 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-10-10
+
+### Changed
+- The New (quick-add) menu now springs open and closed, growing from the side
+  its button is on, instead of a faint fade.
+- The menu's rows are text only (icons removed on every platform) and have
+  more vertical room.
+
 ## [1.1.2] - 2026-10-10
 
 ### Changed
