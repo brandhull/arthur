@@ -120,7 +120,7 @@ public actor SenecaStore {
         guard config.isBaserowConfigured, let tableId = config.senecaTableId else { return }
 
         let client = BaserowClient(token: config.baserowToken)
-        guard let rows = try? await client.listRows(tableId: tableId) else { return }
+        guard let rows = try? await client.listAllRows(tableId: tableId) else { return }
 
         let quoteField = config.senecaQuoteField
         let authorField = config.senecaAuthorField

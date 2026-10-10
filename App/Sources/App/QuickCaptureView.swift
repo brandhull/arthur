@@ -412,6 +412,7 @@ struct QuickCaptureView: View {
     private func submitCraft() {
         guard let selectedDoc else { return }
         isCraftSubmitting = true
+        craftErrorMessage = nil
         let client = CraftClient(url: store.config.craftLink)
         // Blank line before the ***** — not appended directly onto the
         // last line — so Craft's markdown parser reads it as its own

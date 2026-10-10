@@ -174,6 +174,7 @@ struct QuickCaptureBarView: View {
             return
         }
         isSubmitting = true
+        errorMessage = nil
         let client = CraftClient(url: config.craftLink)
         // Same separator markdown as the main app's Quick Capture — verified
         // live that ***** (not ***) is what actually round-trips to Craft's

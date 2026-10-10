@@ -70,8 +70,8 @@ public struct BaserowClient {
     /// there's no fixed Codable shape to decode into — this hands back the
     /// raw per-field values keyed by field name (`user_field_names=true`)
     /// for the caller to pull known field names out of. `size` caps at
-    /// Baserow's own page-size ceiling (200); fine for a commonplace-book
-    /// table, not built to paginate through thousands of rows.
+    /// Baserow's own page-size ceiling (200); use `listAllRows` to go past
+    /// one page.
     ///
     /// `search`, when non-nil/non-empty, adds Baserow's own `search=` query
     /// param — the row-list endpoint filters server-side against every
@@ -86,8 +86,26 @@ public struct BaserowClient {
     /// field guaranteed to exist on every table to order by instead.
     /// Callers wanting "most recent" sort the default (unordered) response
     /// client-side.
-    public func listRows(tableId: Int, search: String? = nil, size: Int = 200) async throws -> [BaserowRow] {
-        var path = "/api/database/rows/table/\(tableId)/?user_field_names=true&size=\(size)"
+    public func listRows(tableId: Int, search: String? = nil, size: Int = 200, page: Int = 1) async throws -> [BaserowRow] {
+        try await listRowsPage(tableId: tableId, search: search, size: size, page: page).rows
+    }
+
+    /// Every row in the table, following Baserow's pagination — `listRows`
+    /// alone stops at one page (200 rows), which silently hid anything past
+    /// that for a table that keeps growing (Seneca). `maxPages` is a safety
+    /// valve (25 pages = 5,000 rows), not an expected limit.
+    public func listAllRows(tableId: Int, maxPages: Int = 25) async throws -> [BaserowRow] {
+        var all: [BaserowRow] = []
+        for page in 1...maxPages {
+            let result = try await listRowsPage(tableId: tableId, search: nil, size: 200, page: page)
+            all += result.rows
+            if !result.hasNext { break }
+        }
+        return all
+    }
+
+    private func listRowsPage(tableId: Int, search: String?, size: Int, page: Int) async throws -> (rows: [BaserowRow], hasNext: Bool) {
+        var path = "/api/database/rows/table/\(tableId)/?user_field_names=true&size=\(size)&page=\(page)"
         if let search, !search.isEmpty {
             let encoded = search.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? search
             path += "&search=\(encoded)"
@@ -96,10 +114,12 @@ public struct BaserowClient {
         guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let results = obj["results"] as? [[String: Any]]
         else { throw BaserowError.badResponse }
-        return results.compactMap { row in
+        let rows = results.compactMap { row -> BaserowRow? in
             guard let id = row["id"] as? Int else { return nil }
             return BaserowRow(id: id, fields: row)
         }
+        // `next` is null (NSNull) on the last page.
+        return (rows, obj["next"] is String)
     }
 
     /// Patches a single field on an existing row — used to stamp a

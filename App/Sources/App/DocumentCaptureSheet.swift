@@ -47,6 +47,9 @@ struct DocumentCaptureSheet: View {
     @State private var isDestinationExpanded = false
     @State private var isSubmitting = false
     @State private var errorMessage: String?
+    // A page created by a submit whose body append then failed. A retry with
+    // the same title/folder reuses it instead of creating a second page.
+    @State private var pendingPage: (id: String, title: String, folderId: String)?
 
     private var effectiveScheme: ColorScheme {
         Theme.effectiveScheme(appearance: store.config.appearance, system: systemScheme)
@@ -88,15 +91,22 @@ struct DocumentCaptureSheet: View {
         titleAndBody.title.isEmpty || selectedFolder == nil || isSubmitting
     }
 
-    private func handleOnAppear() {
-        guard allFolders.isEmpty, !isLoadingFolders else { return }
+    /// Fetched every time Document capture is shown (see the onChange on
+    /// `isPresented`), not just once — this view stays mounted for the whole
+    /// app run, so a one-shot onAppear load meant a failed first fetch (e.g.
+    /// offline at launch) left folder search empty until restart, and
+    /// folders created later never appeared. A failed refresh keeps the
+    /// list already loaded.
+    private func loadFolders() {
+        guard !isLoadingFolders else { return }
         isLoadingFolders = true
         Task {
             defer { isLoadingFolders = false }
             let client = CraftClient(url: store.config.craftLink)
-            allFolders = (try? await client.listFolders())?.sorted {
+            guard let folders = try? await client.listFolders() else { return }
+            allFolders = folders.sorted {
                 $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
-            } ?? []
+            }
         }
     }
 
@@ -104,13 +114,25 @@ struct DocumentCaptureSheet: View {
         guard let selectedFolder else { return }
         let (title, body) = titleAndBody
         isSubmitting = true
+        errorMessage = nil
         let client = CraftClient(url: store.config.craftLink)
+        let folderId = selectedFolder.id
         Task {
             do {
-                let newId = try await client.createDocument(title: title, folderId: selectedFolder.id)
+                // Reuse a page left over from an earlier attempt whose body
+                // append failed — the page already exists in Craft, so
+                // creating it again would leave an empty duplicate behind.
+                let newId: String
+                if let pending = pendingPage, pending.title == title, pending.folderId == folderId {
+                    newId = pending.id
+                } else {
+                    newId = try await client.createDocument(title: title, folderId: folderId)
+                    pendingPage = (newId, title, folderId)
+                }
                 if !body.isEmpty {
                     try await client.appendBlocks(pageId: newId, markdown: body)
                 }
+                pendingPage = nil
                 text = ""
                 query = ""
                 self.selectedFolder = nil
@@ -167,7 +189,10 @@ struct DocumentCaptureSheet: View {
             .padding(.top, 6)
             .padding(.trailing, 6)
         }
-        .onAppear(perform: handleOnAppear)
+        .onAppear(perform: loadFolders)
+        .onChange(of: isPresented) {
+            if isPresented { loadFolders() }
+        }
     }
 
     private var destinationHeader: some View {

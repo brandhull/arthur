@@ -77,6 +77,7 @@ struct QuickAddView: View {
         }
         let destination = config.inboxes.first { $0.id == destinationId } ?? config.defaultInbox
         isSubmitting = true
+        errorMessage = nil
         let client = CraftClient(url: config.craftLink)
         let submittedText = text
         // Same yyyy-MM-dd/.current-timezone formatting as TaskStore.isoDay
