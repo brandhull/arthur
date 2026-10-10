@@ -299,6 +299,14 @@ private struct NSTextViewBridge: NSViewRepresentable {
         // equivalent hazard. Less likely to trigger via plain autocorrect
         // on Mac, but cheap to guard against for the same reason.
         guard !textView.hasMarkedText() else { return }
+        // AgendaView keeps every screen mounted and hides inactive ones with
+        // opacity 0 + .disabled(true). A hidden-but-editable NSTextView still
+        // owns its cursor rect, so the Mac showed the I-beam over whatever
+        // screen was actually visible underneath. A disabled editor stops
+        // being editable/selectable, which gives the cursor back.
+        let enabled = context.environment.isEnabled
+        if textView.isEditable != enabled { textView.isEditable = enabled }
+        if textView.isSelectable != enabled { textView.isSelectable = enabled }
         if textView.string != text { textView.string = text }
         if textView.font != font { textView.font = font }
         if textView.textColor != textColor { textView.textColor = textColor }

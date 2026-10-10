@@ -227,30 +227,38 @@ struct AgendaView: View {
             RocksView(store: store)
                 .opacity(selectedTab == .rocks && !coverShowing ? 1 : 0)
                 .allowsHitTesting(selectedTab == .rocks && !coverShowing)
+                .disabled(!(selectedTab == .rocks && !coverShowing))
             BitsView(store: store, bits: bits, isActive: selectedTab == .bits && !coverShowing)
                 .opacity(selectedTab == .bits && !coverShowing ? 1 : 0)
                 .allowsHitTesting(selectedTab == .bits && !coverShowing)
+                .disabled(!(selectedTab == .bits && !coverShowing))
             TasksView(store: store)
                 .opacity(selectedTab == .tasks && !coverShowing ? 1 : 0)
                 .allowsHitTesting(selectedTab == .tasks && !coverShowing)
+                .disabled(!(selectedTab == .tasks && !coverShowing))
             QuickCaptureView(
                 store: store, documentStore: documentStore, source: $quickCaptureSource,
                 isActive: selectedTab == .quickCapture, isDestinationExpanded: $isDestinationExpanded
             )
                 .opacity(selectedTab == .quickCapture && !coverShowing ? 1 : 0)
                 .allowsHitTesting(selectedTab == .quickCapture && !coverShowing)
+                .disabled(!(selectedTab == .quickCapture && !coverShowing))
             ReflectionView(store: store)
                 .opacity(selectedTab == .reflection && !coverShowing ? 1 : 0)
                 .allowsHitTesting(selectedTab == .reflection && !coverShowing)
+                .disabled(!(selectedTab == .reflection && !coverShowing))
             SearchCraftView(store: store)
                 .opacity(selectedTab == .searchCraft && !coverShowing ? 1 : 0)
                 .allowsHitTesting(selectedTab == .searchCraft && !coverShowing)
+                .disabled(!(selectedTab == .searchCraft && !coverShowing))
             DocumentCaptureSheet(store: store, isPresented: $showingDocumentCapture)
                 .opacity(showingDocumentCapture ? 1 : 0)
                 .allowsHitTesting(showingDocumentCapture)
+                .disabled(!(showingDocumentCapture))
             BitCaptureView(store: store, bits: bits, isPresented: $showingBitCapture, selectedTab: $selectedTab)
                 .opacity(showingBitCapture ? 1 : 0)
                 .allowsHitTesting(showingBitCapture)
+                .disabled(!(showingBitCapture))
         }
         // Picking any real destination while Document is showing dismisses
         // it, the same way selecting any other tab always shows that tab —
