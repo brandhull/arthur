@@ -5,6 +5,16 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-10
+
+### Added
+- Bits tab (between Rocks and Tasks): your Bits from Baserow as cards, newest
+  50 first, each with Edit / Copy / Archive / Delete; tap a card's text to edit
+  it in place with Cancel / Save. An Archive view lists archived Bits with
+  Copy / Restore / Delete. Pick the Bits table in Settings.
+- "Bits" row in the New (quick-add) menu: a blank capture screen that saves a
+  new Bit and then shows the Bits list.
+
 ## [1.0.1] - 2026-10-10
 
 ### Changed
