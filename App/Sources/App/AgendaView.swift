@@ -277,7 +277,9 @@ struct AgendaView: View {
 
     #if os(iOS)
     private var isFloatingButtonHidden: Bool {
-        selectedTab == .quickCapture && quickCaptureSource == .craft && isDestinationExpanded
+        (selectedTab == .quickCapture && quickCaptureSource == .craft && isDestinationExpanded)
+            // Bit capture's Save button sits where this floating button does.
+            || showingBitCapture
     }
 
     /// iPhone-only floating quick-add button (iPad uses a non-floating

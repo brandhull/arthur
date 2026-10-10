@@ -2,8 +2,9 @@ import SwiftUI
 import ArthurKit
 
 /// The "Bits" quick-add flow — the same blank capture screen as Quick
-/// Capture's Craft mode (a big text box filling the pane, a bottom card),
-/// except there's no destination: the card holds just Save. Embedded as an
+/// Capture's Craft mode (a big text box filling the pane), except there's no
+/// destination to pick, so Save is just a button that appears at the bottom
+/// right once there's something to save. Embedded as an
 /// opacity-swapped layer in AgendaView's tabContent, same as
 /// DocumentCaptureSheet, so the sidebar/hamburger stays reachable. Saving
 /// closes this and switches to the Bits tab, where the new Bit is on top.
@@ -24,16 +25,8 @@ struct BitCaptureView: View {
 
     private var inputFontSize: CGFloat { Theme.inputFontSize() }
 
-    private var cardHorizontalInset: CGFloat {
-        #if os(macOS)
-        return Theme.sidebarCardInset
-        #else
-        return 16
-        #endif
-    }
-
-    private var canSave: Bool {
-        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSaving
+    private var hasText: Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
@@ -57,28 +50,25 @@ struct BitCaptureView: View {
             .padding(.bottom, 16)
             .frame(maxHeight: .infinity)
 
-            VStack(alignment: .trailing, spacing: 8) {
-                if let errorMessage {
-                    Text(errorMessage)
-                        .foregroundStyle(.red)
-                        .font(.caption)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+            // No Save button (or surrounding container) until there's text.
+            if hasText || errorMessage != nil {
+                VStack(alignment: .trailing, spacing: 8) {
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .foregroundStyle(.red)
+                            .font(.caption)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if hasText {
+                        PillButton(systemImage: "arrow.up.circle", label: isSaving ? "Saving…" : "Save", action: save)
+                            .disabled(isSaving)
+                    }
                 }
-                PillButton(systemImage: "arrow.up.circle", label: isSaving ? "Saving…" : "Save", action: save)
-                    .disabled(!canSave)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 16)
             }
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
-                    .fill(Theme.sidebarCardBackground(effectiveScheme))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
-                    .stroke(Theme.primary(effectiveScheme).opacity(Theme.borderOpacity), lineWidth: Theme.borderWidth)
-            )
-            .padding(.horizontal, cardHorizontalInset)
-            .padding(.bottom, Theme.sidebarCardInset)
         }
+        .animation(.easeInOut(duration: 0.15), value: hasText)
         .foregroundStyle(Theme.primary(effectiveScheme))
         .background(Theme.background(effectiveScheme))
         .overlay(alignment: .topTrailing) {
