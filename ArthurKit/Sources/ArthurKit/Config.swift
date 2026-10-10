@@ -54,6 +54,10 @@ public struct Config: Codable {
     public var senecaTableId: Int?
     public var senecaQuoteField: String
     public var senecaAuthorField: String
+    /// The Baserow table behind the Bits tab (the same table the standalone
+    /// Bits web app uses).
+    public var bitsDatabaseId: Int?
+    public var bitsTableId: Int?
     /// Cached rootBlockId for the "Rocks" doc in the "Personal" folder —
     /// resolved once via CraftClient.resolveDocument(title:folder:) rather
     /// than re-searching the folder on every launch. Cleared and re-resolved
@@ -80,6 +84,7 @@ public struct Config: Codable {
                 lastBaserowDatabaseId: Int? = nil, lastBaserowTableId: Int? = nil,
                 senecaDatabaseId: Int? = nil, senecaTableId: Int? = nil,
                 senecaQuoteField: String = "Quote", senecaAuthorField: String = "Author",
+                bitsDatabaseId: Int? = nil, bitsTableId: Int? = nil,
                 rocksDocumentId: String? = nil, pinOnTop: Bool = false,
                 lastModified: Date = .distantPast) {
         self.craftLink = craftLink
@@ -94,6 +99,8 @@ public struct Config: Codable {
         self.senecaTableId = senecaTableId
         self.senecaQuoteField = senecaQuoteField
         self.senecaAuthorField = senecaAuthorField
+        self.bitsDatabaseId = bitsDatabaseId
+        self.bitsTableId = bitsTableId
         self.rocksDocumentId = rocksDocumentId
         self.pinOnTop = pinOnTop
         self.lastModified = lastModified
@@ -120,6 +127,8 @@ public struct Config: Codable {
         senecaTableId = try c.decodeIfPresent(Int.self, forKey: .senecaTableId)
         senecaQuoteField = try c.decodeIfPresent(String.self, forKey: .senecaQuoteField) ?? "Quote"
         senecaAuthorField = try c.decodeIfPresent(String.self, forKey: .senecaAuthorField) ?? "Author"
+        bitsDatabaseId = try c.decodeIfPresent(Int.self, forKey: .bitsDatabaseId)
+        bitsTableId = try c.decodeIfPresent(Int.self, forKey: .bitsTableId)
         rocksDocumentId = try c.decodeIfPresent(String.self, forKey: .rocksDocumentId)
         pinOnTop = try c.decodeIfPresent(Bool.self, forKey: .pinOnTop) ?? false
         lastModified = try c.decodeIfPresent(Date.self, forKey: .lastModified) ?? .distantPast
@@ -275,6 +284,8 @@ public struct Config: Codable {
     public var isConfigured: Bool { !craftLink.isEmpty && URL(string: craftLink) != nil }
 
     public var isBaserowConfigured: Bool { !baserowToken.isEmpty && !baserowDatabases.isEmpty }
+
+    public var isBitsConfigured: Bool { isBaserowConfigured && bitsTableId != nil }
 
     public var isAnthropicConfigured: Bool { !anthropicApiKey.isEmpty }
 }

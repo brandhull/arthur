@@ -15,6 +15,7 @@ import ArthurKit
 /// + AnthropicClient, not a browse-and-pick-a-destination tool.
 enum HomeTab: String, CaseIterable, Identifiable {
     case rocks = "Rocks"
+    case bits = "Bits"
     case tasks = "Tasks"
     case quickCapture = "Quick Capture"
     case reflection = "Reflection"
@@ -25,6 +26,7 @@ enum HomeTab: String, CaseIterable, Identifiable {
 struct AgendaView: View {
     @StateObject private var store = TaskStore()
     @StateObject private var documentStore = DocumentStore()
+    @StateObject private var bits = BitsStore()
     @Environment(\.colorScheme) private var systemScheme
     @Environment(\.scenePhase) private var scenePhase
     #if os(iOS)
@@ -36,6 +38,10 @@ struct AgendaView: View {
     // part of the sidebar/drawer nav yet (Brandon: "for now"), reachable
     // only via the quick-add popup's Document row.
     @State private var showingDocumentCapture = false
+    // "Bits" quick-add flow — a blank capture screen that saves a new Bit,
+    // reachable only via the quick-add popup's Bits row. Same embedded-layer
+    // treatment as Document.
+    @State private var showingBitCapture = false
     // Shared by iPhone's floating quick-add button and iPad's top-bar/
     // sidebar quick-add button — only one of the three is ever actually
     // mounted at a time depending on device/orientation, so one Bool is
@@ -125,6 +131,7 @@ struct AgendaView: View {
                 QuickAddModal(
                     store: store, selectedTab: $selectedTab,
                     showingAddTask: $showingAddTask, showingDocumentCapture: $showingDocumentCapture,
+                    showingBitCapture: $showingBitCapture,
                     isPresented: $showingQuickAdd
                 )
             }
@@ -185,6 +192,7 @@ struct AgendaView: View {
             // list Quick Capture searches against.
             documentStore.refresh(craftLink: store.config.craftLink)
             await store.forceSync()
+            await bits.load(store.config)
         }
         .alert("Something went wrong", isPresented: .constant(store.errorMessage != nil), actions: {
             Button("OK") { store.errorMessage = nil }
@@ -217,26 +225,32 @@ struct AgendaView: View {
     private var tabContent: some View {
         ZStack {
             RocksView(store: store)
-                .opacity(selectedTab == .rocks && !showingDocumentCapture ? 1 : 0)
-                .allowsHitTesting(selectedTab == .rocks && !showingDocumentCapture)
+                .opacity(selectedTab == .rocks && !coverShowing ? 1 : 0)
+                .allowsHitTesting(selectedTab == .rocks && !coverShowing)
+            BitsView(store: store, bits: bits, isActive: selectedTab == .bits && !coverShowing)
+                .opacity(selectedTab == .bits && !coverShowing ? 1 : 0)
+                .allowsHitTesting(selectedTab == .bits && !coverShowing)
             TasksView(store: store)
-                .opacity(selectedTab == .tasks && !showingDocumentCapture ? 1 : 0)
-                .allowsHitTesting(selectedTab == .tasks && !showingDocumentCapture)
+                .opacity(selectedTab == .tasks && !coverShowing ? 1 : 0)
+                .allowsHitTesting(selectedTab == .tasks && !coverShowing)
             QuickCaptureView(
                 store: store, documentStore: documentStore, source: $quickCaptureSource,
                 isActive: selectedTab == .quickCapture, isDestinationExpanded: $isDestinationExpanded
             )
-                .opacity(selectedTab == .quickCapture && !showingDocumentCapture ? 1 : 0)
-                .allowsHitTesting(selectedTab == .quickCapture && !showingDocumentCapture)
+                .opacity(selectedTab == .quickCapture && !coverShowing ? 1 : 0)
+                .allowsHitTesting(selectedTab == .quickCapture && !coverShowing)
             ReflectionView(store: store)
-                .opacity(selectedTab == .reflection && !showingDocumentCapture ? 1 : 0)
-                .allowsHitTesting(selectedTab == .reflection && !showingDocumentCapture)
+                .opacity(selectedTab == .reflection && !coverShowing ? 1 : 0)
+                .allowsHitTesting(selectedTab == .reflection && !coverShowing)
             SearchCraftView(store: store)
-                .opacity(selectedTab == .searchCraft && !showingDocumentCapture ? 1 : 0)
-                .allowsHitTesting(selectedTab == .searchCraft && !showingDocumentCapture)
+                .opacity(selectedTab == .searchCraft && !coverShowing ? 1 : 0)
+                .allowsHitTesting(selectedTab == .searchCraft && !coverShowing)
             DocumentCaptureSheet(store: store, isPresented: $showingDocumentCapture)
                 .opacity(showingDocumentCapture ? 1 : 0)
                 .allowsHitTesting(showingDocumentCapture)
+            BitCaptureView(store: store, bits: bits, isPresented: $showingBitCapture, selectedTab: $selectedTab)
+                .opacity(showingBitCapture ? 1 : 0)
+                .allowsHitTesting(showingBitCapture)
         }
         // Picking any real destination while Document is showing dismisses
         // it, the same way selecting any other tab always shows that tab —
@@ -245,9 +259,13 @@ struct AgendaView: View {
         // to). Doesn't cover re-tapping whatever tab was already selected
         // underneath (onChange only fires on an actual value change) — the
         // X button in Document itself is the fallback for that.
-        .onChange(of: selectedTab) { showingDocumentCapture = false }
-        .onChange(of: quickCaptureSource) { showingDocumentCapture = false }
+        .onChange(of: selectedTab) { showingDocumentCapture = false; showingBitCapture = false }
+        .onChange(of: quickCaptureSource) { showingDocumentCapture = false; showingBitCapture = false }
     }
+
+    /// Document and Bits capture are full-pane layers over whichever tab is
+    /// selected; while either shows, every real tab is hidden.
+    private var coverShowing: Bool { showingDocumentCapture || showingBitCapture }
 
     #if os(iOS)
     private var isFloatingButtonHidden: Bool {

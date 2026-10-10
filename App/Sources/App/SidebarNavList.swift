@@ -1,7 +1,7 @@
 import SwiftUI
 import ArthurKit
 
-/// The 7-row nav list (Rocks, Tasks, "Quick Capture" label + nested Craft/
+/// The 8-row nav list (Rocks, Bits, Tasks, "Quick Capture" label + nested Craft/
 /// Baserow rows, Reflection, Search Craft) plus the bottom-pinned Settings
 /// gear row —
 /// extracted out of Mac's SidebarView so the exact same nav content can be
@@ -41,6 +41,9 @@ struct SidebarNavList: View {
             VStack(alignment: .leading, spacing: 2) {
                 navRow(title: HomeTab.rocks.rawValue, isActive: selectedTab == .rocks) {
                     selectedTab = .rocks
+                }
+                navRow(title: HomeTab.bits.rawValue, isActive: selectedTab == .bits) {
+                    selectedTab = .bits
                 }
                 navRow(title: HomeTab.tasks.rawValue, isActive: selectedTab == .tasks) {
                     selectedTab = .tasks

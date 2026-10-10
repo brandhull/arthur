@@ -1,9 +1,10 @@
 import SwiftUI
 import ArthurKit
 
-/// The bubble.and.pencil quick-add popup's content. Four options: Task
+/// The bubble.and.pencil quick-add popup's content. Five options: Task
 /// (opens AddTaskSheet unchanged), Quick Capture (just switches the
-/// selected tab), Document (opens DocumentCaptureSheet — a new Craft page
+/// selected tab), Bits (opens BitCaptureView — a blank capture screen that
+/// saves a new Bit), Document (opens DocumentCaptureSheet — a new Craft page
 /// in a chosen folder, not part of the sidebar nav yet), and Reflection,
 /// which — per Brandon's explicit call — doesn't navigate anywhere: the
 /// modal transitions in place to a small inline compose box that appends
@@ -25,6 +26,7 @@ struct QuickAddModal: View {
     @Binding var selectedTab: HomeTab
     @Binding var showingAddTask: Bool
     @Binding var showingDocumentCapture: Bool
+    @Binding var showingBitCapture: Bool
     @Binding var isPresented: Bool
     @Environment(\.colorScheme) private var systemScheme
 
@@ -70,6 +72,11 @@ struct QuickAddModal: View {
             quickAddRow(title: "Quick Capture", systemImage: "bolt") {
                 isPresented = false
                 selectedTab = .quickCapture
+            }
+            Divider()
+            quickAddRow(title: "Bits", systemImage: "text.badge.plus") {
+                isPresented = false
+                showingBitCapture = true
             }
             Divider()
             quickAddRow(title: "Document", systemImage: "doc.badge.plus") {

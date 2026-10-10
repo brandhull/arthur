@@ -87,6 +87,9 @@ struct SettingsView: View {
     @State private var senecaQuoteField: String = "Quote"
     @State private var senecaAuthorField: String = "Author"
 
+    @State private var bitsDatabaseId: Int?
+    @State private var bitsTableId: Int?
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -426,6 +429,17 @@ struct SettingsView: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 8)
 
+                    FieldLabel(title: "Bits")
+                    BaserowTablePicker(
+                        databases: baserowDatabases, token: baserowToken, scheme: effectiveScheme,
+                        databaseId: $bitsDatabaseId, tableId: $bitsTableId
+                    )
+                    Text("Pick the table the Bits app uses. It needs a long-text field named \"Text\", a \"Created on\" field named \"Created\", and a checkbox field named \"Archived\".")
+                        .font(.caption)
+                        .foregroundStyle(Theme.secondaryText(effectiveScheme))
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
+
                     FieldLabel(title: "Sync")
                     Button {
                         Task {
@@ -555,6 +569,8 @@ struct SettingsView: View {
         senecaTableId = store.config.senecaTableId
         senecaQuoteField = store.config.senecaQuoteField
         senecaAuthorField = store.config.senecaAuthorField
+        bitsDatabaseId = store.config.bitsDatabaseId
+        bitsTableId = store.config.bitsTableId
         // Setting senecaDatabaseId above (nil -> a real id) fires the
         // .onChange handler on the Picker, which loads this database's
         // tables — no separate call needed here.
@@ -642,6 +658,12 @@ struct SettingsView: View {
             senecaDatabaseId = nil
             senecaTableId = nil
         }
+        if let dbId = bitsDatabaseId, !baserowDatabases.contains(where: { $0.id == dbId }) {
+            bitsDatabaseId = nil
+            bitsTableId = nil
+        }
+        store.config.bitsDatabaseId = bitsDatabaseId
+        store.config.bitsTableId = bitsTableId
         store.config.senecaDatabaseId = senecaDatabaseId
         store.config.senecaTableId = senecaTableId
         store.config.senecaQuoteField = senecaQuoteField.trimmingCharacters(in: .whitespaces).isEmpty ? "Quote" : senecaQuoteField
@@ -650,5 +672,85 @@ struct SettingsView: View {
         store.reloadConfig()
         documentStore.refresh(craftLink: store.config.craftLink)
         Task { await store.forceSync() }
+    }
+}
+
+/// Database → Table pickers for a Baserow table setting (used by Bits).
+/// Loads the table list whenever the database changes, including the first
+/// time Settings restores a saved selection, and — like the Seneca section —
+/// never clears a saved table because a fetch failed.
+private struct BaserowTablePicker: View {
+    let databases: [BaserowDatabase]
+    let token: String
+    let scheme: ColorScheme
+    @Binding var databaseId: Int?
+    @Binding var tableId: Int?
+
+    @State private var tables: [BaserowTable] = []
+    @State private var isLoading = false
+
+    var body: some View {
+        FieldBox(scheme: scheme) {
+            #if os(macOS)
+            Picker("Database", selection: $databaseId) {
+                Text("Select a database").tag(Int?.none)
+                ForEach(databases) { db in
+                    Text(db.name).tag(Int?.some(db.id))
+                }
+            }
+            .padding(12)
+            #else
+            MenuFieldPicker(
+                placeholder: "Select a database",
+                options: databases.map { (label: $0.name, value: Optional($0.id)) },
+                noneValue: Optional<Int>.none,
+                selection: $databaseId, fontSize: Theme.inputFontSize(), scheme: scheme
+            )
+            #endif
+        }
+
+        FieldBox(scheme: scheme) {
+            if isLoading {
+                HStack { Spacer(); ProgressView(); Spacer() }.padding(12)
+            } else {
+                #if os(macOS)
+                Picker("Table", selection: $tableId) {
+                    Text(tables.isEmpty ? "Select a database first" : "Select a table").tag(Int?.none)
+                    ForEach(tables) { t in
+                        Text(t.name).tag(Int?.some(t.id))
+                    }
+                }
+                .padding(12)
+                .disabled(tables.isEmpty)
+                #else
+                MenuFieldPicker(
+                    placeholder: tables.isEmpty ? "Select a database first" : "Select a table",
+                    options: tables.map { (label: $0.name, value: Optional($0.id)) },
+                    noneValue: Optional<Int>.none,
+                    selection: $tableId, fontSize: Theme.inputFontSize(), scheme: scheme,
+                    disabled: tables.isEmpty
+                )
+                #endif
+            }
+        }
+        .padding(.top, 8)
+        .task(id: databaseId) { await loadTables() }
+    }
+
+    private func loadTables() async {
+        guard let databaseId else {
+            tables = []
+            return
+        }
+        isLoading = true
+        defer { isLoading = false }
+        guard let fetched = try? await BaserowClient(token: token).listTables(databaseId: databaseId) else {
+            tables = []
+            return
+        }
+        tables = fetched
+        if let tableId, !fetched.contains(where: { $0.id == tableId }) {
+            self.tableId = nil
+        }
     }
 }

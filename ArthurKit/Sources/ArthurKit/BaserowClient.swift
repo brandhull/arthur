@@ -61,9 +61,13 @@ public struct BaserowClient {
         return try JSONDecoder().decode([BaserowField].self, from: data)
     }
 
-    public func createRow(tableId: Int, fields: [String: Any]) async throws {
+    @discardableResult
+    public func createRow(tableId: Int, fields: [String: Any]) async throws -> BaserowRow? {
         let body = try JSONSerialization.data(withJSONObject: fields)
-        _ = try await request("/api/database/rows/table/\(tableId)/?user_field_names=true", method: "POST", body: body)
+        let data = try await request("/api/database/rows/table/\(tableId)/?user_field_names=true", method: "POST", body: body)
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let id = obj["id"] as? Int else { return nil }
+        return BaserowRow(id: id, fields: obj)
     }
 
     /// Rows have an arbitrary, per-table schema, so unlike `listFields`
@@ -86,8 +90,13 @@ public struct BaserowClient {
     /// field guaranteed to exist on every table to order by instead.
     /// Callers wanting "most recent" sort the default (unordered) response
     /// client-side.
-    public func listRows(tableId: Int, search: String? = nil, size: Int = 200, page: Int = 1) async throws -> [BaserowRow] {
-        try await listRowsPage(tableId: tableId, search: search, size: size, page: page).rows
+    ///
+    /// `extraQuery` is appended verbatim to the query string (already
+    /// percent-encoded, no leading `&`) — e.g. `order_by=-Created` or
+    /// `filter__Archived__boolean=false`, which Baserow applies server-side.
+    public func listRows(tableId: Int, search: String? = nil, size: Int = 200, page: Int = 1,
+                         extraQuery: String? = nil) async throws -> [BaserowRow] {
+        try await listRowsPage(tableId: tableId, search: search, size: size, page: page, extraQuery: extraQuery).rows
     }
 
     /// Every row in the table, following Baserow's pagination — `listRows`
@@ -97,19 +106,20 @@ public struct BaserowClient {
     public func listAllRows(tableId: Int, maxPages: Int = 25) async throws -> [BaserowRow] {
         var all: [BaserowRow] = []
         for page in 1...maxPages {
-            let result = try await listRowsPage(tableId: tableId, search: nil, size: 200, page: page)
+            let result = try await listRowsPage(tableId: tableId, search: nil, size: 200, page: page, extraQuery: nil)
             all += result.rows
             if !result.hasNext { break }
         }
         return all
     }
 
-    private func listRowsPage(tableId: Int, search: String?, size: Int, page: Int) async throws -> (rows: [BaserowRow], hasNext: Bool) {
+    private func listRowsPage(tableId: Int, search: String?, size: Int, page: Int, extraQuery: String?) async throws -> (rows: [BaserowRow], hasNext: Bool) {
         var path = "/api/database/rows/table/\(tableId)/?user_field_names=true&size=\(size)&page=\(page)"
         if let search, !search.isEmpty {
             let encoded = search.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? search
             path += "&search=\(encoded)"
         }
+        if let extraQuery, !extraQuery.isEmpty { path += "&\(extraQuery)" }
         let data = try await request(path)
         guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let results = obj["results"] as? [[String: Any]]
@@ -126,7 +136,21 @@ public struct BaserowClient {
     /// "last shown" date after a quote is displayed, without touching any
     /// of the row's other fields.
     public func updateRowField(tableId: Int, rowId: Int, fieldName: String, value: Any) async throws {
-        let body = try JSONSerialization.data(withJSONObject: [fieldName: value])
+        try await updateRow(tableId: tableId, rowId: rowId, fields: [fieldName: value])
+    }
+
+    /// Patches several fields on an existing row at once.
+    public func updateRow(tableId: Int, rowId: Int, fields: [String: Any]) async throws {
+        let body = try JSONSerialization.data(withJSONObject: fields)
         _ = try await request("/api/database/rows/table/\(tableId)/\(rowId)/?user_field_names=true", method: "PATCH", body: body)
+    }
+
+    /// Permanently removes a row. A 404 (already gone) counts as success.
+    public func deleteRow(tableId: Int, rowId: Int) async throws {
+        do {
+            _ = try await request("/api/database/rows/table/\(tableId)/\(rowId)/", method: "DELETE")
+        } catch BaserowError.http(404, _) {
+            return
+        }
     }
 }
