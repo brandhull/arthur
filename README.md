@@ -4,27 +4,43 @@ A native SwiftUI task/notes app for daily use across Mac, iPad, and iPhone — s
 
 ## Tabs
 
-- **Rocks** — reads and edits a single Craft page ("Rocks" in the Personal folder) in place. Edit → Save rewrites the whole page.
-- **Tasks** — Today/Tomorrow filtered view of Craft tasks. Tap a task's text to edit it inline; tap its due date for a native picker. Today absorbs Overdue.
-- **Quick Capture** — free-form text pushed either to any Craft page (search for the destination) or as a new row into any configured Baserow table, behind a Craft/Baserow toggle.
-- **Reflection** — the daily note. Read-only by default; Edit/Save/Cancel to rewrite it in place. A separate quick-append flow is also available from the floating "+" button.
-- **Search Baserow** — pick a database, then a table, then search (or leave the search box empty to see the 5 most recent entries). Tap a result for a read-only detail popup showing every populated field.
+- **Rocks** — reads and edits a single Craft page ("Rocks" in the Personal folder) in place. Edit → Save rewrites the whole page; a failed save keeps your draft open.
+- **Bits** — a scratchpad of temporary text, backed by a Baserow table (the same one the standalone Bits web app uses). Newest 50 first, as cards with Edit / Copy / Archive / Delete; tap a card's text to edit it in place. An Archive view lists archived Bits, where you can Copy, Restore, or Delete them. Delete removes the row from Baserow; Archive only marks it.
+- **Tasks** — All/Today/Tomorrow filtered view of Craft tasks. Tap a task's text to edit it inline; tap its due date for a native picker. Today absorbs Overdue.
+- **Quick Capture** — free-form text pushed either to any Craft page or sub-page (search for the destination, optional separator) or as a new row into any configured Baserow table, behind a Craft/Baserow toggle.
+- **Reflection** — the daily note. Read-only by default; Edit → Save/Cancel to rewrite it in place.
 
 Rocks and Reflection's read-only display renders actual markdown (headings, bullets, blockquotes, inline emphasis) rather than raw text — see `MarkdownContentView`.
 
+## The New menu
+
+The bubble-and-pencil button (floating on iPhone; in the sidebar on Mac and iPad landscape, in the top bar on iPad portrait) opens a short menu: **Task**, **Quick Capture**, **Bits**, **Reflection**, or **Document**. Bits, Reflection, and Document each open a blank full-screen capture; Save appears once there's something to save.
+
+- **Bits** saves a new Bit and shows the Bits tab.
+- **Reflection** appends to today's daily note and shows the Reflection tab.
+- **Document** creates a brand-new Craft page in a folder you choose, using the first line as its title.
+
+## Editing
+
+In the main app's text boxes, starting a line with `- ` or `1. ` gives a list with a hanging indent so wrapped lines align under the text. Return continues the list (numbers count up), and Return on an empty item ends it.
+
 ## Also included
 
-- **ArthurBar** — a menu-bar companion app with a global hotkey (⌥⌘A by default) that opens a floating quick-add panel, for capturing a task without switching to the main app.
-- A splash screen that rotates through your own saved quotes, pulled live from a Baserow table.
+- **ArthurBar** — a menu-bar companion with two global hotkeys (Quick Task and Quick Capture; ⌥⌘A and ⌥⌘C by default, rebindable from its menu) that open floating panels for capturing without switching to the main app.
+- A splash screen that rotates through your own saved quotes, pulled live from a Baserow table and cached locally so launch never waits on the network.
+- Settings sync across your devices through iCloud key-value storage. Appearance (System/Light/Dark) stays per device.
+- Layout adapts per device: a collapsible, resizable sidebar on Mac and iPad landscape, a slide-out drawer on iPhone and iPad portrait.
 
 ## Project structure
 
 ```
 App/          — the main SwiftUI app (Mac + iOS/iPadOS targets share this source)
-ArthurKit/    — Swift package: CraftClient, BaserowClient, Config, and shared models
+ArthurKit/    — Swift package: CraftClient, BaserowClient, Config, Bits, and shared models
 Bar/          — ArthurBar, the menu-bar companion (Mac only)
 project.yml   — xcodegen project definition (source of truth for Arthur.xcodeproj)
-SCOPE.md      — original scoping doc with architecture/design decisions
+SCOPE.md      — scoping doc with architecture/design decisions, updated as the app evolved
+VERSIONING.md — how versions are numbered, and how to cut a release
+CHANGELOG.md  — what changed in each version
 ```
 
 ## Building
@@ -37,11 +53,17 @@ xcodegen generate
 open Arthur.xcodeproj
 ```
 
-Build/run the `Arthur-Mac` or `Arthur-iOS` scheme for the main app, or `ArthurBar` for the menu-bar companion. Whenever files are added or removed, re-run `xcodegen generate` — this resets each target's Signing Team, so reselect it in Xcode before building to a physical device.
+Build/run the `Arthur-Mac` or `Arthur-iOS` scheme for the main app, or `ArthurBar` for the menu-bar companion. Whenever files are added or removed, re-run `xcodegen generate`, then check each target's Signing Team in Xcode before building to a physical device.
 
 ## Configuration
 
-On first launch, open Settings and paste your Craft MCP link and (optionally) a Baserow API token. Configuration is stored locally per device (`~/Library/Application Support/Arthur/config.json` on Mac, the app's own container on iOS/iPadOS) — nothing is synced across devices yet; that's planned once iCloud entitlements are set up.
+On first launch, open Settings and paste your Craft MCP link. Optionally add a Baserow API token and the databases you want available (Quick Capture's Baserow side, Bits, and the splash quotes all use these), then pick the Bits table and the Seneca quotes table. Inbox documents for new tasks are added there too.
+
+Configuration is stored locally per device (`~/Library/Application Support/Arthur/config.json` on Mac, the app's own container on iOS/iPadOS) and synced across devices through iCloud key-value storage, so it needs the shared iCloud entitlement set up in Xcode.
+
+## Versioning
+
+Semantic versioning (`MAJOR.MINOR.PATCH`) shared by all three targets, plus a build number stamped from the git commit count. The version and build show at the bottom of Settings. See [VERSIONING.md](VERSIONING.md) and [CHANGELOG.md](CHANGELOG.md).
 
 ## Distribution
 
