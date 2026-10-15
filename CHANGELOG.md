@@ -5,6 +5,19 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-15
+
+### Changed
+- The Destination bar in Quick Capture and New Document opens and collapses
+  from a tap or click anywhere on it, on every platform, not just the chevron.
+
+### Fixed
+- Long notes in Quick Capture, New Document and the other text boxes no
+  longer blank out, bounce, or lose the cursor while typing. The list-indent
+  code no longer restyles the whole note on every keystroke, and the editor
+  uses the older text layout engine that handles long text reliably. ArthurBar's
+  Quick Capture panel gets the same engine.
+
 ## [1.2.0] - 2026-10-10
 
 ### Changed
