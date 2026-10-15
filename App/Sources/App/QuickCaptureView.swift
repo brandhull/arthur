@@ -192,50 +192,28 @@ struct QuickCaptureView: View {
     /// everything below (destination picker, Add Separator, Save), leaving
     /// just this header row so the capture box above gets that space back.
     private var destinationHeader: some View {
-        HStack {
-            // Size: Mac keeps 15; iOS/iPadOS now match Theme.inputFontSize,
-            // part of Brandon's ask to standardize every scattered iOS
-            // label size to the header date's own size. Weight: matches
-            // Theme.headingWeight on both — the exact weight the header
-            // date itself uses — instead of a bespoke .semibold, per
-            // Brandon's explicit ask to match "Destination" to the date.
-            #if os(macOS)
-            Text("Destination")
-                .font(.system(size: 15, weight: Theme.headingWeight))
-                .foregroundStyle(Color.primary)
-            #else
-            Text("Destination")
-                .font(.system(size: Theme.inputFontSize(), weight: Theme.headingWeight))
-                .foregroundStyle(Color.primary)
-            #endif
-            Spacer()
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) { isDestinationExpanded.toggle() }
-            } label: {
+        // The whole bar is the button (on every platform), not just the small
+        // chevron — tap or click anywhere on it to expand or collapse.
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) { isDestinationExpanded.toggle() }
+        } label: {
+            HStack {
+                Text("Destination")
+                    .font(.system(size: Theme.inputFontSize(), weight: Theme.headingWeight))
+                    .foregroundStyle(Color.primary)
+                Spacer()
                 Image(systemName: isDestinationExpanded ? "chevron.down" : "chevron.up")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.secondaryText(effectiveScheme))
                     .frame(width: 24, height: 24)
-                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .help(isDestinationExpanded ? "Collapse" : "Expand")
+            .padding(.horizontal, 20)
+            .padding(.top, 14)
+            .padding(.bottom, isDestinationExpanded ? 0 : 14)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 14)
-        .padding(.bottom, isDestinationExpanded ? 0 : 14)
-        #if os(macOS)
-        // Mac-only, per Brandon's ask: when collapsed, the whole bar (not
-        // just the small chevron hit-target) expands it. The chevron
-        // button's own tap still consumes its own region and calls its own
-        // toggle action first, so this only ever fires for a click
-        // elsewhere on the bar — never double-toggles back to collapsed.
-        .contentShape(Rectangle())
-        .onTapGesture {
-            guard !isDestinationExpanded else { return }
-            withAnimation(.easeInOut(duration: 0.15)) { isDestinationExpanded = true }
-        }
-        #endif
+        .buttonStyle(.plain)
+        .help(isDestinationExpanded ? "Collapse" : "Expand")
     }
 
     // MARK: - Craft section (formerly CaptureSheet)

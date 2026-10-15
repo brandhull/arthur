@@ -15,7 +15,9 @@ struct BarTextEditor: NSViewRepresentable {
     let font: NSFont
 
     func makeNSView(context: Context) -> NSScrollView {
-        let textView = NSTextView()
+        // TextKit 1 — see PlainTextEditor in the main app: TextKit 2 misbehaves
+        // (blank text, bouncing scroll, lost cursor) on long notes.
+        let textView = NSTextView(usingTextLayoutManager: false)
         textView.font = font
         textView.drawsBackground = false
         textView.isEditable = true

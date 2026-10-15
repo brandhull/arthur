@@ -72,6 +72,38 @@ private func continuedMarker(_ marker: String) -> String {
     return String(leading) + "\(n + 1). "
 }
 
+/// Shared by both platform bridges — gives every list item (a "- ", "* " or
+/// "1. " line) a hanging indent equal to its marker's width, so wrapped
+/// lines align under the text.
+///
+/// Only touches paragraphs whose indent actually needs to change. This used
+/// to rewrite the paragraph style of *every* paragraph on every keystroke (and
+/// again on each SwiftUI update pass), which invalidated the layout of the
+/// whole document each time — on a long note that made the text view lose
+/// its drawn text, bounce its scroll position, and lose the cursor.
+private func applyHangingIndents(to storage: NSTextStorage, font: Any) {
+    let ns = storage.string as NSString
+    var changes: [(range: NSRange, indent: CGFloat)] = []
+    ns.enumerateSubstrings(in: NSRange(location: 0, length: ns.length), options: .byParagraphs) { substring, _, enclosingRange, _ in
+        // The empty final paragraph (after a trailing newline) has no
+        // characters to attach a style to.
+        guard enclosingRange.length > 0 else { return }
+        let indent: CGFloat = bulletMarker(in: substring ?? "")
+            .map { ($0 as NSString).size(withAttributes: [.font: font]).width } ?? 0
+        let current = (storage.attribute(.paragraphStyle, at: enclosingRange.location, effectiveRange: nil)
+            as? NSParagraphStyle)?.headIndent ?? 0
+        if abs(current - indent) > 0.5 { changes.append((enclosingRange, indent)) }
+    }
+    guard !changes.isEmpty else { return }
+    storage.beginEditing()
+    for change in changes {
+        let style = NSMutableParagraphStyle()
+        style.headIndent = change.indent
+        storage.addAttribute(.paragraphStyle, value: style, range: change.range)
+    }
+    storage.endEditing()
+}
+
 struct PlainTextEditor: View {
     @Binding var text: String
     let fontSize: CGFloat
@@ -107,7 +139,10 @@ private struct UITextViewBridge: UIViewRepresentable {
     let textColor: UIColor
 
     func makeUIView(context: Context) -> UITextView {
-        let view = UITextView()
+        // TextKit 1, not the default TextKit 2 — TextKit 2 lays long text out
+        // lazily from estimated heights, which made long notes blank out,
+        // bounce, and lose the cursor while typing.
+        let view = UITextView(usingTextLayoutManager: false)
         view.font = font
         view.textColor = textColor
         view.backgroundColor = .clear
@@ -139,19 +174,7 @@ private struct UITextViewBridge: UIViewRepresentable {
     /// string that gets pushed, this is purely how it's laid out on screen
     /// while typing.
     static func applyBulletIndent(_ textView: UITextView) {
-        let ns = textView.text as NSString
-        let font = textView.font ?? .systemFont(ofSize: 15)
-        let storage = textView.textStorage
-        storage.beginEditing()
-        ns.enumerateSubstrings(in: NSRange(location: 0, length: ns.length), options: .byParagraphs) { substring, _, enclosingRange, _ in
-            let style = NSMutableParagraphStyle()
-            if let marker = bulletMarker(in: substring ?? "") {
-                let width = (marker as NSString).size(withAttributes: [.font: font]).width
-                style.headIndent = width
-            }
-            storage.addAttribute(.paragraphStyle, value: style, range: enclosingRange)
-        }
-        storage.endEditing()
+        applyHangingIndents(to: textView.textStorage, font: textView.font ?? UIFont.systemFont(ofSize: 15))
     }
 
     func updateUIView(_ uiView: UITextView, context: Context) {
@@ -233,7 +256,10 @@ private struct NSTextViewBridge: NSViewRepresentable {
     var autoFocusWhen: Bool = false
 
     func makeNSView(context: Context) -> NSScrollView {
-        let textView = NSTextView()
+        // TextKit 1, not the default TextKit 2 — TextKit 2 lays long text out
+        // lazily from estimated heights, which made long notes blank out,
+        // bounce, and lose the cursor while typing.
+        let textView = NSTextView(usingTextLayoutManager: false)
         textView.font = font
         textView.textColor = textColor
         textView.drawsBackground = false
@@ -276,19 +302,8 @@ private struct NSTextViewBridge: NSViewRepresentable {
     /// Foundation type/key on both platforms, just measured against an
     /// NSFont here instead of a UIFont.
     static func applyBulletIndent(_ textView: NSTextView) {
-        let ns = textView.string as NSString
-        let font = textView.font ?? .systemFont(ofSize: 15)
         guard let storage = textView.textStorage else { return }
-        storage.beginEditing()
-        ns.enumerateSubstrings(in: NSRange(location: 0, length: ns.length), options: .byParagraphs) { substring, _, enclosingRange, _ in
-            let style = NSMutableParagraphStyle()
-            if let marker = bulletMarker(in: substring ?? "") {
-                let width = (marker as NSString).size(withAttributes: [.font: font]).width
-                style.headIndent = width
-            }
-            storage.addAttribute(.paragraphStyle, value: style, range: enclosingRange)
-        }
-        storage.endEditing()
+        applyHangingIndents(to: storage, font: textView.font ?? NSFont.systemFont(ofSize: 15))
     }
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
