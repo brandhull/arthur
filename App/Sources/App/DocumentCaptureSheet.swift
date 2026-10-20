@@ -39,6 +39,8 @@ struct DocumentCaptureSheet: View {
     // same showingDocumentCapture flag AgendaView's tabContent already
     // keys this view's visibility on.
     @Binding var isPresented: Bool
+    /// True while the top bar's preview toggle is on — see QuickCaptureView.
+    let isPreviewing: Bool
     @Environment(\.colorScheme) private var systemScheme
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -247,7 +249,7 @@ struct DocumentCaptureSheet: View {
     private var captureBox: some View {
         FieldBox(scheme: effectiveScheme, bordered: false) {
             ZStack(alignment: .topLeading) {
-                if text.isEmpty {
+                if text.isEmpty && !isPreviewing {
                     Text("Nothing here yet.")
                         .font(.system(size: inputFontSize))
                         .foregroundStyle(Theme.secondaryText(effectiveScheme))
@@ -256,6 +258,17 @@ struct DocumentCaptureSheet: View {
                 }
                 PlainTextEditor(text: $text, fontSize: inputFontSize, scheme: effectiveScheme)
                     .frame(minHeight: 120, maxHeight: .infinity)
+                    .opacity(isPreviewing ? 0 : 1)
+                    .disabled(isPreviewing)
+
+                if isPreviewing {
+                    // First line is the page title, the rest is the body —
+                    // same split Save uses.
+                    CapturePreviewPane(
+                        text: titleAndBody.body, title: titleAndBody.title,
+                        fontSize: inputFontSize, scheme: effectiveScheme
+                    )
+                }
             }
         }
         // 16, matching QuickCaptureView's craftCaptureBox exactly — was 36

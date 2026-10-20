@@ -16,6 +16,9 @@ struct TextCaptureView: View {
     @Binding var isPresented: Bool
     let save: (String) async -> String?
     let onSaved: () -> Void
+    /// True while the top bar's preview toggle is on. Bits never previews
+    /// (plain text to Baserow), so only Reflection passes this.
+    var isPreviewing: Bool = false
     @Environment(\.colorScheme) private var systemScheme
 
     @State private var text = ""
@@ -36,7 +39,7 @@ struct TextCaptureView: View {
         VStack(spacing: 0) {
             FieldBox(scheme: effectiveScheme, bordered: false) {
                 ZStack(alignment: .topLeading) {
-                    if text.isEmpty {
+                    if text.isEmpty && !isPreviewing {
                         Text("Nothing here yet.")
                             .font(.system(size: inputFontSize))
                             .foregroundStyle(Theme.secondaryText(effectiveScheme))
@@ -47,6 +50,12 @@ struct TextCaptureView: View {
                         text: $text, fontSize: inputFontSize, scheme: effectiveScheme, autoFocusWhen: isPresented
                     )
                     .frame(minHeight: 120, maxHeight: .infinity)
+                    .opacity(isPreviewing ? 0 : 1)
+                    .disabled(isPreviewing)
+
+                    if isPreviewing {
+                        CapturePreviewPane(text: text, fontSize: inputFontSize, scheme: effectiveScheme)
+                    }
                 }
             }
             .padding(.top, 16)

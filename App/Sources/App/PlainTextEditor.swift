@@ -194,6 +194,10 @@ private struct UITextViewBridge: UIViewRepresentable {
         // `text` current once the candidate is committed/dismissed and
         // markedTextRange clears, so nothing is lost, just deferred.
         guard uiView.markedTextRange == nil else { return }
+        // Hidden/disabled layers (and the markdown preview) stop being
+        // editable, which also drops the keyboard if this had focus.
+        let enabled = context.environment.isEnabled
+        if uiView.isEditable != enabled { uiView.isEditable = enabled }
         if uiView.text != text { uiView.text = text }
         if uiView.font != font { uiView.font = font }
         if uiView.textColor != textColor { uiView.textColor = textColor }

@@ -211,6 +211,15 @@ enum Theme {
         #endif
     }
 
+    /// iPhone/iPad top-left menu icons are deliberately larger than the system
+    /// default: the hamburger (iPhone, iPad portrait) and New button (iPad
+    /// portrait) in the top bar, and the sidebar toggle and New button inside
+    /// iPad landscape's sidebar. Mac keeps its own smaller icons.
+    static let topBarIconSize: CGFloat = 26
+    static let topBarIconFrame: CGFloat = 52
+    static let menuIconSize: CGFloat = 22
+    static let menuIconFrame: CGFloat = 40
+
     /// Mac sidebar resize bounds (the sidebar redesign's HSplitView leading
     /// child). Not platform-conditional — this whole token group is only
     /// ever read from Mac-only files, but lives here rather than a separate

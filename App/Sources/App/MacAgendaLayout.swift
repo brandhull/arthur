@@ -18,6 +18,10 @@ struct MacAgendaLayout<Content: View>: View {
     @Binding var showingSettings: Bool
     @Binding var showingAddTask: Bool
     @Binding var showingQuickAdd: Bool
+    /// Markdown preview toggle for the capture screens — the button only
+    /// shows while one of them is on screen (`previewAvailable`).
+    @Binding var isPreviewing: Bool
+    let previewAvailable: Bool
     let effectiveScheme: ColorScheme
     let content: Content
 
@@ -30,6 +34,7 @@ struct MacAgendaLayout<Content: View>: View {
     init(
         store: TaskStore, selectedTab: Binding<HomeTab>, quickCaptureSource: Binding<QuickCaptureSource>,
         showingSettings: Binding<Bool>, showingAddTask: Binding<Bool>, showingQuickAdd: Binding<Bool>,
+        isPreviewing: Binding<Bool>, previewAvailable: Bool,
         effectiveScheme: ColorScheme,
         @ViewBuilder content: () -> Content
     ) {
@@ -39,6 +44,8 @@ struct MacAgendaLayout<Content: View>: View {
         self._showingSettings = showingSettings
         self._showingAddTask = showingAddTask
         self._showingQuickAdd = showingQuickAdd
+        self._isPreviewing = isPreviewing
+        self.previewAvailable = previewAvailable
         self.effectiveScheme = effectiveScheme
         self.content = content()
     }
@@ -117,6 +124,20 @@ struct MacAgendaLayout<Content: View>: View {
                 .font(.system(size: Theme.sectionHeadingSize, weight: Theme.headingWeight))
 
             Spacer()
+
+            if previewAvailable {
+                Button {
+                    isPreviewing.toggle()
+                } label: {
+                    Image(systemName: isPreviewing ? "eye.fill" : "eye")
+                        .font(.system(size: 15))
+                        .foregroundStyle(isPreviewing ? Theme.accentBright : Theme.secondaryText(effectiveScheme))
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(isPreviewing ? "Back to editing" : "Preview how this will look in Craft")
+            }
 
             // Pin-on-top — unaffected by this redesign, just relocated here
             // (was the top bar's leading icon, alongside the now-relocated

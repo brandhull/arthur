@@ -21,6 +21,10 @@ struct iOSAgendaLayout<Content: View>: View {
     @Binding var showingSettings: Bool
     @Binding var showingAddTask: Bool
     @Binding var showingQuickAdd: Bool
+    /// Markdown preview toggle for the capture screens — the button only
+    /// shows while one of them is on screen (`previewAvailable`).
+    @Binding var isPreviewing: Bool
+    let previewAvailable: Bool
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let effectiveScheme: ColorScheme
     let content: Content
@@ -38,6 +42,7 @@ struct iOSAgendaLayout<Content: View>: View {
     init(
         store: TaskStore, selectedTab: Binding<HomeTab>, quickCaptureSource: Binding<QuickCaptureSource>,
         showingSettings: Binding<Bool>, showingAddTask: Binding<Bool>, showingQuickAdd: Binding<Bool>,
+        isPreviewing: Binding<Bool>, previewAvailable: Bool,
         effectiveScheme: ColorScheme, @ViewBuilder content: () -> Content
     ) {
         self.store = store
@@ -46,6 +51,8 @@ struct iOSAgendaLayout<Content: View>: View {
         self._showingSettings = showingSettings
         self._showingAddTask = showingAddTask
         self._showingQuickAdd = showingQuickAdd
+        self._isPreviewing = isPreviewing
+        self.previewAvailable = previewAvailable
         self.effectiveScheme = effectiveScheme
         self.content = content()
     }
@@ -105,6 +112,25 @@ struct iOSAgendaLayout<Content: View>: View {
         }
     }
 
+    /// Same footprint as the appearance button beside it; only present while
+    /// a capture screen with something to preview is showing.
+    @ViewBuilder
+    private var previewButton: some View {
+        if previewAvailable {
+            Button {
+                isPreviewing.toggle()
+            } label: {
+                Image(systemName: isPreviewing ? "eye.fill" : "eye")
+                    .font(.system(size: 18))
+                    .foregroundStyle(isPreviewing ? Theme.accentBright : Theme.primary(effectiveScheme))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isPreviewing ? "Back to editing" : "Preview markdown")
+        }
+    }
+
     private var landscapeTopBar: some View {
         HStack(spacing: 10) {
             if sidebarCollapsed {
@@ -112,8 +138,8 @@ struct iOSAgendaLayout<Content: View>: View {
                     withAnimation(.easeInOut(duration: 0.18)) { sidebarCollapsed = false }
                 } label: {
                     Image(systemName: "sidebar.left")
-                        .font(.system(size: 15))
-                        .frame(width: 28, height: 28)
+                        .font(.system(size: Theme.menuIconSize))
+                        .frame(width: Theme.menuIconFrame, height: Theme.menuIconFrame)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -123,6 +149,8 @@ struct iOSAgendaLayout<Content: View>: View {
                 .font(.system(size: Theme.sectionHeadingSize, weight: Theme.headingWeight))
 
             Spacer()
+
+            previewButton
 
             AppearanceCycleButton(store: store, effectiveScheme: effectiveScheme)
         }
@@ -138,8 +166,8 @@ struct iOSAgendaLayout<Content: View>: View {
                 showingDrawer = true
             } label: {
                 Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 18))
-                    .frame(width: 44, height: 44)
+                    .font(.system(size: Theme.topBarIconSize))
+                    .frame(width: Theme.topBarIconFrame, height: Theme.topBarIconFrame)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -160,12 +188,14 @@ struct iOSAgendaLayout<Content: View>: View {
                     showingQuickAdd = true
                 } label: {
                     Image(systemName: "bubble.and.pencil")
-                        .font(.system(size: 18))
-                        .frame(width: 44, height: 44)
+                        .font(.system(size: Theme.topBarIconSize))
+                        .frame(width: Theme.topBarIconFrame, height: Theme.topBarIconFrame)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
+
+            previewButton
 
             AppearanceCycleButton(store: store, effectiveScheme: effectiveScheme)
         }

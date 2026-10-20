@@ -43,6 +43,10 @@ struct AgendaView: View {
     // "Reflection" quick-add flow — a blank capture screen that appends to
     // today's daily note.
     @State private var showingReflectionCapture = false
+    // Top-bar markdown preview toggle, shared by Quick Capture (Craft),
+    // New Document, and New Reflection. Reset whenever the visible screen
+    // changes (see previewScreenID) so a preview never carries over.
+    @State private var isPreviewing = false
     // Shared by iPhone's floating quick-add button and iPad's top-bar/
     // sidebar quick-add button — only one of the three is ever actually
     // mounted at a time depending on device/orientation, so one Bool is
@@ -77,7 +81,9 @@ struct AgendaView: View {
             MacAgendaLayout(
                 store: store, selectedTab: $selectedTab, quickCaptureSource: $quickCaptureSource,
                 showingSettings: $showingSettings, showingAddTask: $showingAddTask,
-                showingQuickAdd: $showingQuickAdd, effectiveScheme: effectiveScheme
+                showingQuickAdd: $showingQuickAdd,
+                isPreviewing: $isPreviewing, previewAvailable: previewAvailable,
+                effectiveScheme: effectiveScheme
             ) {
                 tabContent
             }
@@ -86,7 +92,9 @@ struct AgendaView: View {
                 iOSAgendaLayout(
                     store: store, selectedTab: $selectedTab, quickCaptureSource: $quickCaptureSource,
                     showingSettings: $showingSettings, showingAddTask: $showingAddTask,
-                    showingQuickAdd: $showingQuickAdd, effectiveScheme: effectiveScheme
+                    showingQuickAdd: $showingQuickAdd,
+                    isPreviewing: $isPreviewing, previewAvailable: previewAvailable,
+                    effectiveScheme: effectiveScheme
                 ) {
                     tabContent
                 }
@@ -234,6 +242,21 @@ struct AgendaView: View {
         #endif
     }
 
+    /// Whether the visible screen has markdown to preview: Quick Capture's
+    /// Craft side, New Document, or New Reflection. (Bits are plain text for
+    /// Baserow, and Quick Capture's Baserow form has no free-form markdown.)
+    private var previewAvailable: Bool {
+        if showingDocumentCapture || showingReflectionCapture { return true }
+        if showingBitCapture { return false }
+        return selectedTab == .quickCapture && quickCaptureSource == .craft
+    }
+
+    /// Changes whenever the visible screen does, so the preview toggle can
+    /// switch itself off instead of leaking onto the next screen.
+    private var previewScreenID: String {
+        "\(selectedTab.rawValue)|\(quickCaptureSource.rawValue)|\(showingDocumentCapture)|\(showingBitCapture)|\(showingReflectionCapture)"
+    }
+
     private var tabContent: some View {
         ZStack {
             RocksView(store: store)
@@ -250,7 +273,8 @@ struct AgendaView: View {
                 .disabled(!(selectedTab == .tasks && !coverShowing))
             QuickCaptureView(
                 store: store, documentStore: documentStore, source: $quickCaptureSource,
-                isActive: selectedTab == .quickCapture, isDestinationExpanded: $isDestinationExpanded
+                isActive: selectedTab == .quickCapture, isPreviewing: isPreviewing,
+                isDestinationExpanded: $isDestinationExpanded
             )
                 .opacity(selectedTab == .quickCapture && !coverShowing ? 1 : 0)
                 .allowsHitTesting(selectedTab == .quickCapture && !coverShowing)
@@ -259,7 +283,7 @@ struct AgendaView: View {
                 .opacity(selectedTab == .reflection && !coverShowing ? 1 : 0)
                 .allowsHitTesting(selectedTab == .reflection && !coverShowing)
                 .disabled(!(selectedTab == .reflection && !coverShowing))
-            DocumentCaptureSheet(store: store, isPresented: $showingDocumentCapture)
+            DocumentCaptureSheet(store: store, isPresented: $showingDocumentCapture, isPreviewing: isPreviewing)
                 .opacity(showingDocumentCapture ? 1 : 0)
                 .allowsHitTesting(showingDocumentCapture)
                 .disabled(!(showingDocumentCapture))
@@ -278,7 +302,8 @@ struct AgendaView: View {
             TextCaptureView(
                 store: store, isPresented: $showingReflectionCapture,
                 save: { text in await store.appendToDailyNote(text) },
-                onSaved: { selectedTab = .reflection }
+                onSaved: { selectedTab = .reflection },
+                isPreviewing: isPreviewing
             )
                 .opacity(showingReflectionCapture ? 1 : 0)
                 .allowsHitTesting(showingReflectionCapture)
@@ -293,6 +318,7 @@ struct AgendaView: View {
         // X button in Document itself is the fallback for that.
         .onChange(of: selectedTab) { showingDocumentCapture = false; showingBitCapture = false; showingReflectionCapture = false }
         .onChange(of: quickCaptureSource) { showingDocumentCapture = false; showingBitCapture = false; showingReflectionCapture = false }
+        .onChange(of: previewScreenID) { isPreviewing = false }
     }
 
     /// Document, Bits and Reflection capture are full-pane layers over whichever tab is

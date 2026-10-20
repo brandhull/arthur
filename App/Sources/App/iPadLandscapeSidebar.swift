@@ -27,8 +27,8 @@ struct iPadLandscapeSidebar: View {
                     withAnimation(.easeInOut(duration: 0.18)) { isCollapsed = true }
                 } label: {
                     Image(systemName: "sidebar.left")
-                        .font(.system(size: 15))
-                        .frame(width: 28, height: 28)
+                        .font(.system(size: Theme.menuIconSize))
+                        .frame(width: Theme.menuIconFrame, height: Theme.menuIconFrame)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -43,8 +43,8 @@ struct iPadLandscapeSidebar: View {
                     showingQuickAdd = true
                 } label: {
                     Image(systemName: "bubble.and.pencil")
-                        .font(.system(size: 15))
-                        .frame(width: 28, height: 28)
+                        .font(.system(size: Theme.menuIconSize))
+                        .frame(width: Theme.menuIconFrame, height: Theme.menuIconFrame)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)

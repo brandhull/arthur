@@ -36,6 +36,10 @@ struct QuickCaptureView: View {
     // on iOS, just unused there.
     let isActive: Bool
 
+    /// True while the top bar's preview toggle is on: the capture box shows
+    /// the text rendered as Craft will receive it instead of the editor.
+    let isPreviewing: Bool
+
     // Collapsing the bottom-docked Destination card back to just its
     // header, per Brandon's request for "a clean interface to type" on
     // every platform. Defaults collapsed: the app should open straight
@@ -224,7 +228,7 @@ struct QuickCaptureView: View {
         // Rocks/Tasks/Reflection's ContentBox, on every platform now.
         FieldBox(scheme: effectiveScheme, bordered: false) {
             ZStack(alignment: .topLeading) {
-                if draft.text.isEmpty {
+                if draft.text.isEmpty && !isPreviewing {
                     // Was a markdown-syntax cheat sheet (# Heading/**Strong**/
                     // etc.) to help Brandon learn Craft's markdown while
                     // typing — removed once he no longer needed the
@@ -236,22 +240,28 @@ struct QuickCaptureView: View {
                         .padding(12)
                         .allowsHitTesting(false)
                 }
-                #if os(macOS)
                 // autoFocusWhen: isActive — dropping the cursor here the
                 // instant Quick Capture becomes the selected sidebar item,
-                // no click needed, since the sidebar's collapsible now (no
-                // more separate pop-out window to expand into instead).
-                // Mac-only — not requested for iOS, and auto-popping the
-                // keyboard on every screen switch could be unwelcome mobile
-                // UX Brandon didn't ask for.
+                // no click needed (Mac only; the editor ignores it on iOS,
+                // where auto-popping the keyboard on every screen switch
+                // would be unwelcome). The editor stays mounted while
+                // previewing, just hidden and disabled, so its cursor and
+                // scroll position survive toggling back.
                 PlainTextEditor(
                     text: $draft.text, fontSize: inputFontSize, scheme: effectiveScheme, autoFocusWhen: isActive
                 )
                 .frame(minHeight: 120, maxHeight: .infinity)
-                #else
-                PlainTextEditor(text: $draft.text, fontSize: inputFontSize, scheme: effectiveScheme)
-                    .frame(minHeight: 120, maxHeight: .infinity)
-                #endif
+                .opacity(isPreviewing ? 0 : 1)
+                .disabled(isPreviewing)
+
+                if isPreviewing {
+                    // Includes the separator Save will append, so the preview
+                    // matches what actually lands in Craft.
+                    CapturePreviewPane(
+                        text: draft.addSeparator && !draft.text.isEmpty ? draft.text + "\n\n*****" : draft.text,
+                        fontSize: inputFontSize, scheme: effectiveScheme
+                    )
+                }
             }
         }
         .padding(.top, 16)
