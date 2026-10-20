@@ -5,6 +5,21 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-19
+
+### Added
+- Markdown preview: an eye button in the top bar (on Quick Capture's Craft
+  side, New Document, and New Reflection) swaps the text box for how the note
+  will land in Craft, following Craft's own import rules — blocks and line
+  breaks, lists and nesting, checkboxes, dividers, quotes, code blocks, and
+  inline bold/italic/code/links/strikethrough/highlight. Quick Capture's
+  preview includes the separator when Add Separator is on, and New Document
+  shows the first line as the page title.
+
+### Changed
+- Bigger menu icons on iPhone and iPad: the hamburger (iPhone, iPad portrait),
+  and the sidebar toggle and New button on iPad.
+
 ## [1.2.1] - 2026-10-15
 
 ### Changed
