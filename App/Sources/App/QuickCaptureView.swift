@@ -652,8 +652,13 @@ struct QuickCaptureView: View {
         do {
             tables = try await baserowClient.listTables(databaseId: databaseId)
             baserowErrorMessage = nil
-            if let lastTable = store.config.lastBaserowTableId, tables.contains(where: { $0.id == lastTable }) {
+            if tables.count == 1 {
+                tableId = tables[0].id
+            } else if let lastTable = store.config.lastBaserowTableId, tables.contains(where: { $0.id == lastTable }) {
                 tableId = lastTable
+            } else if let all = tables.first(where: { $0.name.caseInsensitiveCompare("All") == .orderedSame }) {
+                // Nearly every database has an "All" table, so it's the sensible default.
+                tableId = all.id
             }
         } catch {
             baserowErrorMessage = error.localizedDescription
@@ -673,6 +678,7 @@ struct QuickCaptureView: View {
             // showing up (or accidentally set) in the Quick Capture form,
             // across any table that happens to have a field by that name.
             fields = all.filter { $0.isWritable && $0.name.caseInsensitiveCompare("Archived") != .orderedSame }
+            applyFieldDefaults()
             baserowErrorMessage = nil
         } catch {
             baserowErrorMessage = error.localizedDescription
@@ -685,6 +691,18 @@ struct QuickCaptureView: View {
         multiSelectValues = [:]
         dateValues = [:]
         includeDateFields = []
+    }
+
+    /// Captures made here are tagged as coming from Arthur: any table with a
+    /// "Source" single-select that has an "Arthur" option (e.g. Quinn) gets it
+    /// preselected, and again after each push clears the form.
+    private func applyFieldDefaults() {
+        for field in fields where field.type == "single_select"
+            && field.name.caseInsensitiveCompare("Source") == .orderedSame {
+            if let arthur = field.selectOptions?.first(where: { $0.value.caseInsensitiveCompare("Arthur") == .orderedSame }) {
+                textValues[field.id] = arthur.value
+            }
+        }
     }
 
     // MARK: - Baserow submit
@@ -729,6 +747,7 @@ struct QuickCaptureView: View {
             store.config.lastBaserowTableId = tableId
             store.config.save()
             clearFieldValues()
+            applyFieldDefaults()
         } catch {
             baserowErrorMessage = error.localizedDescription
         }
