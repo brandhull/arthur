@@ -5,6 +5,22 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-08
+
+### Changed
+- Quick Capture's Baserow form picks a sensible table for you (the database's
+  only table, else the last one you used, else "All") and presets a Source
+  field to Arthur when the table has one.
+- The iPhone's floating "new" button hides while the keyboard is up.
+
+### Fixed
+- Picking a database or table in the Baserow form is instant after the first
+  time: it shows the last-known tables and fields right away and refreshes
+  behind them. The same applies to the table pickers in Settings.
+- Baserow reads time out after 15 seconds and retry once, instead of a stalled
+  connection leaving a spinner for up to a minute; if loading still fails, the
+  form shows the error with a Retry button.
+
 ## [1.3.0] - 2026-10-19
 
 ### Added
