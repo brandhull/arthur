@@ -274,9 +274,14 @@ final class TaskStore: ObservableObject {
         }
     }
 
+    /// Set when the last `appendToDailyNote` failed only because the device is
+    /// clearly offline, so the caller can queue it.
+    private(set) var lastAppendWasOffline = false
+
     /// Appends `text` to today's note (the "Add" button flow), then reloads
     /// the displayed content so it reflects what's actually in Craft.
     func appendToDailyNote(_ text: String) async -> String? {
+        lastAppendWasOffline = false
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         guard config.isConfigured else { return CraftError.notConfigured.localizedDescription }
@@ -285,6 +290,7 @@ final class TaskStore: ObservableObject {
         do {
             try await client.appendBlocksToDailyNote(day: "today", markdown: trimmed)
         } catch {
+            lastAppendWasOffline = isClearlyOffline(error)
             return error.localizedDescription
         }
         await loadDailyNote()

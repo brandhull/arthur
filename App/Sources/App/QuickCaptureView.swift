@@ -18,6 +18,7 @@ struct QuickCaptureView: View {
     @ObservedObject var store: TaskStore
     @ObservedObject var documentStore: DocumentStore
     @EnvironmentObject var draft: QuickCaptureDraft
+    @ObservedObject var outbox: OutboxStore
     @Environment(\.colorScheme) private var systemScheme
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -416,6 +417,7 @@ struct QuickCaptureView: View {
         let markdown = draft.addSeparator ? draft.text + "\n\n*****" : draft.text
         Task {
             do {
+                if !outbox.isOnline { throw URLError(.notConnectedToInternet) }
                 try await client.appendBlocks(pageId: selectedDoc.id, markdown: markdown)
                 // Mark the top-level parent used, not the sub-page itself,
                 // when one was selected — Brandon: sub-page titles repeat
@@ -434,8 +436,22 @@ struct QuickCaptureView: View {
                 subPages = []
                 draft.addSeparator = true
             } catch {
-                craftErrorMessage = error.localizedDescription
-                isCraftSubmitting = false
+                if isClearlyOffline(error) {
+                    // No connection: keep it on disk and clear the screen as
+                    // if sent; the outbox delivers it when we're back online.
+                    outbox.enqueue(OutboxItem(kind: .craftPage, text: markdown,
+                                              pageId: selectedDoc.id, pageTitle: selectedDoc.title))
+                    documentStore.markUsed(subPagesParentId ?? selectedDoc.id)
+                    isCraftSubmitting = false
+                    draft.text = ""
+                    query = ""
+                    self.selectedDoc = nil
+                    subPages = []
+                    draft.addSeparator = true
+                } else {
+                    craftErrorMessage = error.localizedDescription
+                    isCraftSubmitting = false
+                }
             }
         }
     }

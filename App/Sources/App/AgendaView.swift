@@ -25,6 +25,7 @@ struct AgendaView: View {
     @StateObject private var store = TaskStore()
     @StateObject private var documentStore = DocumentStore()
     @StateObject private var bits = BitsStore()
+    @StateObject private var outbox = OutboxStore()
     @Environment(\.colorScheme) private var systemScheme
     @Environment(\.scenePhase) private var scenePhase
     #if os(iOS)
@@ -284,7 +285,7 @@ struct AgendaView: View {
                 .allowsHitTesting(selectedTab == .tasks && !coverShowing)
                 .disabled(!(selectedTab == .tasks && !coverShowing))
             QuickCaptureView(
-                store: store, documentStore: documentStore, source: $quickCaptureSource,
+                store: store, documentStore: documentStore, outbox: outbox, source: $quickCaptureSource,
                 isActive: selectedTab == .quickCapture, isPreviewing: isPreviewing,
                 isDestinationExpanded: $isDestinationExpanded
             )
@@ -303,8 +304,16 @@ struct AgendaView: View {
                 store: store, isPresented: $showingBitCapture,
                 save: { text in
                     guard store.config.isBitsConfigured else { return "Choose your Bits table in Settings." }
-                    return await bits.add(text: text, config: store.config)
-                        ? nil : (bits.errorMessage ?? "Couldn’t save that Bit.")
+                    if !outbox.isOnline {
+                        outbox.enqueue(OutboxItem(kind: .bit, text: text))
+                        return nil
+                    }
+                    if await bits.add(text: text, config: store.config) { return nil }
+                    if bits.lastAddWasOffline {
+                        outbox.enqueue(OutboxItem(kind: .bit, text: text))
+                        return nil
+                    }
+                    return bits.errorMessage ?? "Couldn’t save that Bit."
                 },
                 onSaved: { selectedTab = .bits }
             )
@@ -313,7 +322,19 @@ struct AgendaView: View {
                 .disabled(!(showingBitCapture))
             TextCaptureView(
                 store: store, isPresented: $showingReflectionCapture,
-                save: { text in await store.appendToDailyNote(text) },
+                save: { text in
+                    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !outbox.isOnline && store.config.isConfigured {
+                        outbox.enqueue(OutboxItem(kind: .reflection, text: trimmed, day: OutboxItem.todayString()))
+                        return nil
+                    }
+                    let failure = await store.appendToDailyNote(text)
+                    if failure != nil && store.lastAppendWasOffline {
+                        outbox.enqueue(OutboxItem(kind: .reflection, text: trimmed, day: OutboxItem.todayString()))
+                        return nil
+                    }
+                    return failure
+                },
                 onSaved: { selectedTab = .reflection },
                 isPreviewing: isPreviewing
             )
@@ -331,6 +352,18 @@ struct AgendaView: View {
         .onChange(of: selectedTab) { showingDocumentCapture = false; showingBitCapture = false; showingReflectionCapture = false }
         .onChange(of: quickCaptureSource) { showingDocumentCapture = false; showingBitCapture = false; showingReflectionCapture = false }
         .onChange(of: previewScreenID) { isPreviewing = false }
+        .overlay(alignment: .bottomLeading) { OutboxBadge(outbox: outbox, scheme: effectiveScheme) }
+        .task {
+            outbox.configProvider = { store.config }
+            outbox.onDelivered = { kinds in
+                Task { @MainActor in
+                    if kinds.contains(.bit) { await bits.load(store.config) }
+                    if kinds.contains(.reflection) { await store.loadDailyNote() }
+                }
+            }
+            await outbox.drain()
+        }
+        .onChange(of: scenePhase) { if scenePhase == .active { Task { await outbox.drain() } } }
     }
 
     /// Document, Bits and Reflection capture are full-pane layers over whichever tab is

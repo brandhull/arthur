@@ -11,6 +11,9 @@ final class BitsStore: ObservableObject {
     @Published var showingArchive = false
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
+    /// Set by `add` when it failed because the device is clearly offline,
+    /// so the caller can queue the Bit instead of reporting an error.
+    private(set) var lastAddWasOffline = false
 
     /// Guards against an older, slower fetch landing after a newer one (e.g.
     /// toggling Bits/Archive quickly) and overwriting the list with the
@@ -54,6 +57,7 @@ final class BitsStore: ObservableObject {
     /// the top. Returns whether Baserow accepted it, so the capture screen
     /// can keep the text on failure.
     func add(text: String, config: Config) async -> Bool {
+        lastAddWasOffline = false
         guard let client = client(config) else {
             errorMessage = "Choose your Bits table in Settings."
             return false
@@ -61,6 +65,7 @@ final class BitsStore: ObservableObject {
         do {
             try await client.add(text: text)
         } catch {
+            lastAddWasOffline = isClearlyOffline(error)
             errorMessage = error.localizedDescription
             return false
         }

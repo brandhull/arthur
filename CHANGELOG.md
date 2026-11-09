@@ -5,6 +5,15 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-09
+
+### Added
+- Offline queue (stage 1): Bits, Reflection and Quick Capture to Craft are
+  saved to disk when the device is clearly offline, the screen clears, and
+  they send in order when the connection returns. A "N waiting to send" pill
+  shows what's queued (Copy / Discard, plus Retry if a send fails for another
+  reason). Timeouts and server errors are never queued, to avoid duplicates.
+
 ## [1.3.1] - 2026-11-08
 
 ### Changed
