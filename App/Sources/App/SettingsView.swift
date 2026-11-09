@@ -565,14 +565,16 @@ struct SettingsView: View {
             senecaTables = []
             return
         }
-        isLoadingSenecaTables = true
+        // Last-known list first (instant), then refresh behind it.
+        let cached = await BaserowCache.shared.tables(for: databaseId)
+        if let cached { senecaTables = cached } else { isLoadingSenecaTables = true }
         defer { isLoadingSenecaTables = false }
         let client = BaserowClient(token: baserowToken)
         // On a failed fetch (offline, bad token) leave the saved selection
         // alone — an empty list from an error must not be mistaken for "this
         // table no longer exists", or pressing Done would persist the wipe.
         guard let tables = try? await client.listTables(databaseId: databaseId) else {
-            senecaTables = []
+            if cached == nil { senecaTables = [] }
             return
         }
         senecaTables = tables
@@ -725,10 +727,12 @@ private struct BaserowTablePicker: View {
             tables = []
             return
         }
-        isLoading = true
+        // Last-known list first (instant), then refresh behind it.
+        let cached = await BaserowCache.shared.tables(for: databaseId)
+        if let cached { tables = cached } else { isLoading = true }
         defer { isLoading = false }
         guard let fetched = try? await BaserowClient(token: token).listTables(databaseId: databaseId) else {
-            tables = []
+            if cached == nil { tables = [] }
             return
         }
         tables = fetched

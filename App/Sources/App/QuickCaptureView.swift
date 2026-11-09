@@ -82,6 +82,10 @@ struct QuickCaptureView: View {
     @State private var isLoadingFields = false
     @State private var isBaserowSubmitting = false
     @State private var baserowErrorMessage: String?
+    /// Which load failed, so the error can offer a Retry for exactly that one.
+    @State private var loadFailure: LoadFailure?
+
+    private enum LoadFailure { case tables, fields }
 
     private static let dateOnlyFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -498,11 +502,26 @@ struct QuickCaptureView: View {
             }
 
             if let baserowErrorMessage {
-                Text(baserowErrorMessage)
-                    .foregroundStyle(.red)
-                    .font(.caption)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(baserowErrorMessage)
+                        .foregroundStyle(.red)
+                        .font(.caption)
+                    Spacer()
+                    if let loadFailure {
+                        Button("Retry") {
+                            Task {
+                                switch loadFailure {
+                                case .tables: await loadTables(for: databaseId)
+                                case .fields: await loadFields(for: tableId)
+                                }
+                            }
+                        }
+                        .font(.caption.weight(.semibold))
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
             }
 
             if tableId != nil && !fields.isEmpty {
@@ -643,46 +662,89 @@ struct QuickCaptureView: View {
 
     // MARK: - Baserow loading
 
+    /// Shows the last-known table list immediately (if there is one) and
+    /// refreshes it behind the scenes, so picking a database is instant after
+    /// the first time. Only a first-ever load shows a spinner, and only that
+    /// can fail visibly — a failed refresh behind a cached list is silent.
     private func loadTables(for databaseId: Int?) async {
         tables = []
         tableId = nil
         guard let databaseId else { return }
-        isLoadingTables = true
+        loadFailure = nil
+        let cached = await BaserowCache.shared.tables(for: databaseId)
+        if let cached {
+            tables = cached
+            chooseDefaultTable()
+        } else {
+            isLoadingTables = true
+        }
         defer { isLoadingTables = false }
         do {
-            tables = try await baserowClient.listTables(databaseId: databaseId)
-            baserowErrorMessage = nil
-            if tables.count == 1 {
-                tableId = tables[0].id
-            } else if let lastTable = store.config.lastBaserowTableId, tables.contains(where: { $0.id == lastTable }) {
-                tableId = lastTable
-            } else if let all = tables.first(where: { $0.name.caseInsensitiveCompare("All") == .orderedSame }) {
-                // Nearly every database has an "All" table, so it's the sensible default.
-                tableId = all.id
+            let fresh = try await baserowClient.listTables(databaseId: databaseId)
+            guard databaseId == self.databaseId else { return } // picked another database meanwhile
+            if fresh != tables {
+                tables = fresh
+                if let current = tableId, !fresh.contains(where: { $0.id == current }) { tableId = nil }
             }
+            chooseDefaultTable()
+            baserowErrorMessage = nil
         } catch {
+            guard databaseId == self.databaseId, cached == nil else { return }
             baserowErrorMessage = error.localizedDescription
+            loadFailure = .tables
         }
     }
 
+    /// Only picks when nothing is selected: the database's single table, else
+    /// the last-used one, else "All" (nearly every database has one).
+    private func chooseDefaultTable() {
+        guard tableId == nil else { return }
+        if tables.count == 1 {
+            tableId = tables[0].id
+        } else if let lastTable = store.config.lastBaserowTableId, tables.contains(where: { $0.id == lastTable }) {
+            tableId = lastTable
+        } else if let all = tables.first(where: { $0.name.caseInsensitiveCompare("All") == .orderedSame }) {
+            tableId = all.id
+        }
+    }
+
+    /// Same cached-first approach as loadTables. A refresh that finds the
+    /// form's shape unchanged does nothing; one that finds it changed swaps
+    /// the fields in without wiping what's already typed.
     private func loadFields(for tableId: Int?) async {
         fields = []
         clearFieldValues()
         guard let tableId else { return }
-        isLoadingFields = true
+        loadFailure = nil
+        let cached = await BaserowCache.shared.fields(for: tableId)
+        if let cached {
+            fields = formFields(from: cached)
+            applyFieldDefaults()
+        } else {
+            isLoadingFields = true
+        }
         defer { isLoadingFields = false }
         do {
-            let all = try await baserowClient.listFields(tableId: tableId)
-            // "Archived" specifically excluded, on top of the isWritable
-            // filter — Brandon: it's Baserow bookkeeping he doesn't want
-            // showing up (or accidentally set) in the Quick Capture form,
-            // across any table that happens to have a field by that name.
-            fields = all.filter { $0.isWritable && $0.name.caseInsensitiveCompare("Archived") != .orderedSame }
-            applyFieldDefaults()
+            let fresh = formFields(from: try await baserowClient.listFields(tableId: tableId))
+            guard tableId == self.tableId else { return } // picked another table meanwhile
+            if fresh != fields {
+                fields = fresh
+                applyFieldDefaults()
+            }
             baserowErrorMessage = nil
         } catch {
+            guard tableId == self.tableId, cached == nil else { return }
             baserowErrorMessage = error.localizedDescription
+            loadFailure = .fields
         }
+    }
+
+    /// "Archived" specifically excluded, on top of the isWritable filter —
+    /// Brandon: it's Baserow bookkeeping he doesn't want showing up (or
+    /// accidentally set) in the Quick Capture form, across any table that
+    /// happens to have a field by that name.
+    private func formFields(from all: [BaserowField]) -> [BaserowField] {
+        all.filter { $0.isWritable && $0.name.caseInsensitiveCompare("Archived") != .orderedSame }
     }
 
     private func clearFieldValues() {
@@ -700,7 +762,9 @@ struct QuickCaptureView: View {
         for field in fields where field.type == "single_select"
             && field.name.caseInsensitiveCompare("Source") == .orderedSame {
             if let arthur = field.selectOptions?.first(where: { $0.value.caseInsensitiveCompare("Arthur") == .orderedSame }) {
-                textValues[field.id] = arthur.value
+                // Only when nothing's chosen yet, so a refresh can't undo a
+                // Source the user already changed.
+                if textValues[field.id] == nil { textValues[field.id] = arthur.value }
             }
         }
     }

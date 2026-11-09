@@ -27,22 +27,45 @@ public struct BaserowClient {
         self.token = token
     }
 
+    /// Reads (GET) time out after 15s and are retried once on a connection
+    /// stall — a connection left open for days (Arthur stays running, the Mac
+    /// sleeps) can go dead, and the first request on it just hangs until the
+    /// timeout. Retrying a read is harmless. Writes are never retried
+    /// automatically: a request that timed out may still have gone through,
+    /// and repeating it would create a duplicate.
     private func request(_ path: String, method: String = "GET", body: Data? = nil) async throws -> Data {
         guard !token.isEmpty else { throw BaserowError.notConfigured }
         guard let url = URL(string: "\(apiURL)\(path)") else { throw BaserowError.badResponse }
         var req = URLRequest(url: url)
         req.httpMethod = method
+        req.timeoutInterval = method == "GET" ? 15 : 30
         req.setValue("Token \(token)", forHTTPHeaderField: "Authorization")
         if let body {
             req.httpBody = body
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
-        let (data, response) = try await URLSession.shared.data(for: req)
-        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-            let detail = String(decoding: data, as: UTF8.self)
-            throw BaserowError.http(http.statusCode, String(detail.prefix(400)))
+        let attempts = method == "GET" ? 2 : 1
+        var lastError: Error = BaserowError.badResponse
+        for attempt in 1...attempts {
+            do {
+                let (data, response) = try await URLSession.shared.data(for: req)
+                if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                    let detail = String(decoding: data, as: UTF8.self)
+                    throw BaserowError.http(http.statusCode, String(detail.prefix(400)))
+                }
+                return data
+            } catch let error as URLError where attempt < attempts && Self.isTransient(error) {
+                lastError = error
+            }
         }
-        return data
+        throw lastError
+    }
+
+    private static func isTransient(_ error: URLError) -> Bool {
+        switch error.code {
+        case .timedOut, .networkConnectionLost, .cannotConnectToHost: return true
+        default: return false
+        }
     }
 
     /// Database tokens can't call `/api/database/tables/database/{id}/`
@@ -53,12 +76,16 @@ public struct BaserowClient {
     public func listTables(databaseId: Int) async throws -> [BaserowTable] {
         let data = try await request("/api/database/tables/all-tables/")
         let all = try JSONDecoder().decode([BaserowTable].self, from: data)
-        return all.filter { $0.databaseId == databaseId }
+        let tables = all.filter { $0.databaseId == databaseId }
+        await BaserowCache.shared.setTables(tables, for: databaseId)
+        return tables
     }
 
     public func listFields(tableId: Int) async throws -> [BaserowField] {
         let data = try await request("/api/database/fields/table/\(tableId)/")
-        return try JSONDecoder().decode([BaserowField].self, from: data)
+        let fields = try JSONDecoder().decode([BaserowField].self, from: data)
+        await BaserowCache.shared.setFields(fields, for: tableId)
+        return fields
     }
 
     @discardableResult

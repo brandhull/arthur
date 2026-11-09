@@ -66,6 +66,11 @@ struct AgendaView: View {
     // expanded — Brandon: the button sitting right where the expanded
     // Destination card's own content now is looked wrong/cluttered.
     @State private var isDestinationExpanded = false
+    #if os(iOS)
+    // True while the software keyboard is up — the iPhone floating button
+    // hides then, since you're typing and it only takes up room.
+    @State private var keyboardVisible = false
+    #endif
 
     private var effectiveScheme: ColorScheme {
         switch store.config.appearance {
@@ -148,6 +153,13 @@ struct AgendaView: View {
         .preferredColorScheme(store.config.appearance == .system ? nil : effectiveScheme)
         #if os(macOS)
         .pinnedOnTop(store.config.pinOnTop)
+        #else
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            keyboardVisible = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardVisible = false
+        }
         #endif
         .sheet(isPresented: $showingSettings) {
             SettingsView(store: store, documentStore: documentStore)
@@ -331,6 +343,8 @@ struct AgendaView: View {
             // Every capture screen's Save button sits where this floating
             // button does.
             || coverShowing
+            // And while typing anywhere, so it isn't in the way.
+            || keyboardVisible
     }
 
     /// iPhone-only floating quick-add button (iPad uses a non-floating
