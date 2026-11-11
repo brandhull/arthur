@@ -21,9 +21,12 @@ public struct CraftDocument: Codable, Identifiable, Hashable {
 public struct CraftFolder: Identifiable, Hashable {
     public let id: String
     public let name: String
+    /// "Parent / Child" display path; equals `name` for top-level folders.
+    public let path: String
 
-    public init(id: String, name: String) {
+    public init(id: String, name: String, path: String? = nil) {
         self.id = id
         self.name = name
+        self.path = path ?? name
     }
 }

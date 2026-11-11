@@ -1,58 +1,38 @@
 import SwiftUI
 import ArthurKit
 
-enum QuickCaptureSource: String, CaseIterable, Identifiable, Hashable {
-    case craft = "Craft"
-    case baserow = "Baserow"
-    var id: String { rawValue }
-}
-
-/// Combines the two former standalone tabs — free-form text pushed to any
-/// Craft page, and a row pushed into any configured Baserow table — behind
-/// one Craft/Baserow selection. Selection is made in the sidebar/drawer's
-/// nested Craft/Baserow rows under "Quick Capture" on every platform now,
-/// not an in-view toggle — `source` is an external binding so whichever
-/// nav component owns it (Mac's SidebarView, the iOS drawer, iPad's
-/// landscape sidebar) can drive it identically.
+/// The one capture screen. A big blank text box fills the pane; the
+/// Destination card docked at the bottom chooses where it goes: an existing
+/// Craft page (search, with sub-pages), a new Craft page in any folder or
+/// sub-folder, today's Reflection, a Bit, a Craft task, or a Baserow row.
+/// Everything except Baserow shares the same text box; Baserow swaps the pane
+/// for its form (anything already typed carries into the first long-text
+/// field). Save sits above the card so a capture never needs it expanded.
 struct QuickCaptureView: View {
     @ObservedObject var store: TaskStore
     @ObservedObject var documentStore: DocumentStore
     @EnvironmentObject var draft: QuickCaptureDraft
     @ObservedObject var outbox: OutboxStore
+    /// Sends a Bit / appends to today's note; nil on success, else an error
+    /// message. Provided by AgendaView, which owns those stores (and the
+    /// offline-queue fallbacks).
+    let saveBit: (String) async -> String?
+    let saveReflection: (String) async -> String?
     @Environment(\.colorScheme) private var systemScheme
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
 
-    // External binding, not internal @State — on Mac the sidebar's nested
-    // Craft/Baserow rows drive this directly (no in-view pill there); on
-    // iOS the owner (AgendaView) still feeds it straight into the unchanged
-    // PillFilterBar toggle below, so nothing looks different there.
-    @Binding var source: QuickCaptureSource
-
-    // True whenever the Quick Capture tab itself is the selected one (set
-    // by AgendaView's shared tabContent, which already knows this from the
-    // opacity-swap condition) — Mac-only use: it's the edge-trigger signal
-    // for auto-focusing the Craft capture box's cursor on arrival. Harmless
-    // on iOS, just unused there.
+    /// True whenever the Quick Capture tab itself is the selected one — the
+    /// edge-trigger for auto-focusing the text box on Mac.
     let isActive: Bool
 
     /// True while the top bar's preview toggle is on: the capture box shows
     /// the text rendered as Craft will receive it instead of the editor.
     let isPreviewing: Bool
 
-    // Collapsing the bottom-docked Destination card back to just its
-    // header, per Brandon's request for "a clean interface to type" on
-    // every platform. Defaults collapsed: the app should open straight
-    // into a clean Quick Capture typing surface right after the splash
-    // screen, not the destination picker already expanded and eating into
-    // that space. Not persisted beyond that — collapsing/expanding later in
-    // the same session behaves as before, just a different starting point.
-    //
-    // Lifted from local @State to an external binding (owned by
-    // AgendaView, alongside selectedTab/quickCaptureSource) so the iPhone
-    // floating quick-add button can hide itself while this is expanded —
-    // AgendaView needs to observe it too, not just this view.
+    /// Whether the Destination card is expanded. Starts collapsed so the app
+    /// opens straight into a clean typing surface. Owned by AgendaView.
     @Binding var isDestinationExpanded: Bool
 
     // MARK: Craft state
@@ -95,7 +75,23 @@ struct QuickCaptureView: View {
         return f
     }()
 
+    // MARK: New-page / task / status state
+    @State private var folderQuery = ""
+    @State private var selectedFolder: CraftFolder?
+    @State private var allFolders: [CraftFolder] = []
+    @State private var isLoadingFolders = false
+    // A page created by a submit whose body append then failed — a retry with
+    // the same title/folder reuses it instead of creating a second page.
+    @State private var pendingPage: (id: String, title: String, folderId: String)?
+    @State private var includeDueDate = false
+    @State private var dueDate = Date()
+    @State private var taskInboxId: String?
+    @State private var statusMessage: String?
+    @State private var didApplyDefaultTarget = false
+
     private var results: [CraftDocument] { documentStore.search(query) }
+
+    private var target: CaptureTarget { draft.target }
 
     private var effectiveScheme: ColorScheme {
         Theme.effectiveScheme(appearance: store.config.appearance, system: systemScheme)
@@ -113,18 +109,20 @@ struct QuickCaptureView: View {
         BaserowClient(token: store.config.baserowToken)
     }
 
-    private func handleOnAppear() {
-        documentStore.refreshIfStale(craftLink: store.config.craftLink)
-        // Deliberately no longer auto-restoring lastBaserowDatabaseId here —
-        // Brandon: opening this screen should always start at "Select a
-        // database", not silently pre-pick whatever he used last time.
+    /// The destination chosen in Settings (Append Craft Page unless changed).
+    private var defaultTarget: CaptureTarget {
+        CaptureTarget(rawValue: store.config.defaultCaptureTarget ?? "") ?? .page
     }
 
-    /// Mac's sidebar sits right beside this card, so 8pt (Theme's shared
-    /// sidebar-card inset) reads as plenty of margin next to it. iPhone/
-    /// iPad have no sidebar there — the same 8pt left the card nearly flush
-    /// with the screen edges, which Brandon flagged as "bumping right up
-    /// against the sides."
+    private func handleOnAppear() {
+        if !didApplyDefaultTarget {
+            didApplyDefaultTarget = true
+            draft.target = defaultTarget
+        }
+        documentStore.refreshIfStale(craftLink: store.config.craftLink)
+        loadFolders()
+    }
+
     private var destinationCardHorizontalInset: CGFloat {
         #if os(macOS)
         return Theme.sidebarCardInset
@@ -133,55 +131,54 @@ struct QuickCaptureView: View {
         #endif
     }
 
-    /// Craft/Baserow is picked in the sidebar/drawer now (nested rows under
-    /// Quick Capture), not an in-view pill, on every platform. The capture
-    /// box fills the main pane, unbordered (Brandon: content should flow
-    /// with just padding, not sit in a box — same principle as Rocks/Tasks/
-    /// Reflection's ContentBox), and the destination picker/Add Separator/
-    /// Save sit in a bottom-docked floating card — same inset/rounded/thin-
-    /// bordered treatment as the sidebar (Theme.sidebarCardBackground).
-    /// Baserow has no equivalent free-text main-pane content, so its whole
-    /// form (Database → Table → fields → Push) just fills the main pane
-    /// directly, per Brandon's explicit call — on every platform.
+    // MARK: - Derived text
+
+    private var trimmedText: String { draft.text.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// First non-empty line becomes a new page's title; the rest is its body.
+    private var titleAndBody: (title: String, body: String) {
+        let lines = draft.text.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+        let title = lines.first.map(String.init)?.trimmingCharacters(in: .whitespaces) ?? ""
+        let body = lines.count > 1 ? String(lines[1]).trimmingCharacters(in: .newlines) : ""
+        return (title, body)
+    }
+
+    private var canSave: Bool {
+        switch target {
+        case .page: return !trimmedText.isEmpty && selectedDoc != nil
+        case .newPage: return !titleAndBody.title.isEmpty && selectedFolder != nil
+        case .reflection, .bits, .task: return !trimmedText.isEmpty
+        case .baserow: return false
+        }
+    }
+
+    /// What the collapsed Destination bar shows next to its title.
+    private var destinationSummary: String {
+        switch target {
+        case .page: return selectedDoc.map { "Append · " + $0.title } ?? "Append Craft Page · choose a page"
+        case .newPage: return "New Craft Page · " + (selectedFolder?.path ?? "choose a folder")
+        case .reflection: return "Reflection"
+        case .bits: return "Bits"
+        case .task: return "New Craft Task"
+        case .baserow:
+            let table = tables.first(where: { $0.id == tableId })?.name
+            return "Baserow" + (table.map { " · \($0)" } ?? "")
+        }
+    }
+
+    private var previewText: String {
+        switch target {
+        case .page: return draft.addSeparator && !draft.text.isEmpty ? draft.text + "\n\n*****" : draft.text
+        case .newPage: return titleAndBody.body
+        default: return draft.text
+        }
+    }
+
+    // MARK: - Body
+
     var body: some View {
         VStack(spacing: 0) {
-            if source == .craft {
-                // No outer ScrollView here — PlainTextEditor's NSTextView is
-                // already wrapped in its own NSScrollView (see
-                // PlainTextEditor.swift), so nesting a second SwiftUI
-                // ScrollView around it just capped the whole box to its
-                // content's intrinsic height instead of letting it fill the
-                // pane, leaving a large dead gap above the Destination
-                // card. Letting craftCaptureBox stretch directly via
-                // maxHeight: .infinity is what actually fills that space —
-                // the inner NSScrollView still handles scrolling once
-                // typed content exceeds the available height.
-                craftCaptureBox
-                    .padding(.bottom, 16)
-                    .frame(maxHeight: .infinity)
-
-                VStack(alignment: .leading, spacing: 0) {
-                    destinationHeader
-                    if isDestinationExpanded {
-                        ScrollView {
-                            destinationFields
-                                .padding(.top, 8)
-                                .padding(.bottom, 16)
-                        }
-                    }
-                }
-                .background(
-                    RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
-                        .fill(Theme.sidebarCardBackground(effectiveScheme))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
-                        .stroke(Theme.primary(effectiveScheme).opacity(Theme.borderOpacity), lineWidth: Theme.borderWidth)
-                )
-                .padding(.horizontal, destinationCardHorizontalInset)
-                .padding(.bottom, Theme.sidebarCardInset)
-                .frame(maxHeight: isDestinationExpanded ? 280 : nil)
-            } else {
+            if target == .baserow {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         baserowSection
@@ -189,28 +186,90 @@ struct QuickCaptureView: View {
                     .padding(.top, 16)
                     .padding(.bottom, 16)
                 }
+                .frame(maxHeight: .infinity)
+            } else {
+                // No outer ScrollView: PlainTextEditor already wraps its own
+                // NSScrollView/UITextView, and nesting a second one capped
+                // the box to its content height.
+                captureBox
+                    .padding(.bottom, 16)
+                    .frame(maxHeight: .infinity)
+
+                if canSave || craftErrorMessage != nil || statusMessage != nil {
+                    VStack(alignment: .trailing, spacing: 8) {
+                        if let craftErrorMessage {
+                            Text(craftErrorMessage)
+                                .foregroundStyle(.red)
+                                .font(.caption)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else if let statusMessage {
+                            Text(statusMessage)
+                                .foregroundStyle(Theme.secondaryText(effectiveScheme))
+                                .font(.caption)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        if canSave {
+                            PillButton(systemImage: "arrow.up.circle", label: isCraftSubmitting ? "Saving…" : "Save", action: save)
+                                .disabled(isCraftSubmitting)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
+                }
             }
+
+            destinationCard
         }
+        .animation(.easeInOut(duration: 0.15), value: canSave)
         .foregroundStyle(Theme.primary(effectiveScheme))
         .onAppear(perform: handleOnAppear)
+        .onChange(of: target) {
+            craftErrorMessage = nil
+            statusMessage = nil
+            if target == .baserow { carryDraftTextIntoForm() }
+        }
     }
 
-    /// "Destination" title + a collapse/expand chevron, top-right of the
-    /// card — Brandon's ask, matching the disclosure affordance he had with
-    /// the old pop-out window's separate capture surface. Collapsing hides
-    /// everything below (destination picker, Add Separator, Save), leaving
-    /// just this header row so the capture box above gets that space back.
+    private var destinationCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            destinationHeader
+            if isDestinationExpanded {
+                ScrollView {
+                    destinationFields
+                        .padding(.top, 8)
+                        .padding(.bottom, 16)
+                }
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
+                .fill(Theme.sidebarCardBackground(effectiveScheme))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
+                .stroke(Theme.primary(effectiveScheme).opacity(Theme.borderOpacity), lineWidth: Theme.borderWidth)
+        )
+        .padding(.horizontal, destinationCardHorizontalInset)
+        .padding(.bottom, Theme.sidebarCardInset)
+        .frame(maxHeight: isDestinationExpanded ? 340 : nil)
+    }
+
+    /// "Destination" + where it's currently pointed + a chevron. The whole
+    /// bar is the button, on every platform.
     private var destinationHeader: some View {
-        // The whole bar is the button (on every platform), not just the small
-        // chevron — tap or click anywhere on it to expand or collapse.
         Button {
             withAnimation(.easeInOut(duration: 0.15)) { isDestinationExpanded.toggle() }
         } label: {
-            HStack {
+            HStack(spacing: 10) {
                 Text("Destination")
                     .font(.system(size: Theme.inputFontSize(), weight: Theme.headingWeight))
                     .foregroundStyle(Color.primary)
-                Spacer()
+                Spacer(minLength: 8)
+                Text(destinationSummary)
+                    .font(.system(size: Theme.inputFontSize()))
+                    .foregroundStyle(Theme.secondaryText(effectiveScheme))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
                 Image(systemName: isDestinationExpanded ? "chevron.down" : "chevron.up")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.secondaryText(effectiveScheme))
@@ -225,33 +284,21 @@ struct QuickCaptureView: View {
         .help(isDestinationExpanded ? "Collapse" : "Expand")
     }
 
-    // MARK: - Craft section (formerly CaptureSheet)
+    // MARK: - Capture box
 
     @ViewBuilder
-    private var craftCaptureBox: some View {
-        // No border — content flows with just padding, same principle as
-        // Rocks/Tasks/Reflection's ContentBox, on every platform now.
+    private var captureBox: some View {
         FieldBox(scheme: effectiveScheme, bordered: false) {
             ZStack(alignment: .topLeading) {
                 if draft.text.isEmpty && !isPreviewing {
-                    // Was a markdown-syntax cheat sheet (# Heading/**Strong**/
-                    // etc.) to help Brandon learn Craft's markdown while
-                    // typing — removed once he no longer needed the
-                    // reminder, back to the same plain placeholder every
-                    // other "Nothing here yet." empty state in the app uses.
                     Text("Nothing here yet.")
                         .font(.system(size: inputFontSize))
                         .foregroundStyle(Theme.secondaryText(effectiveScheme))
                         .padding(12)
                         .allowsHitTesting(false)
                 }
-                // autoFocusWhen: isActive — dropping the cursor here the
-                // instant Quick Capture becomes the selected sidebar item,
-                // no click needed (Mac only; the editor ignores it on iOS,
-                // where auto-popping the keyboard on every screen switch
-                // would be unwelcome). The editor stays mounted while
-                // previewing, just hidden and disabled, so its cursor and
-                // scroll position survive toggling back.
+                // The editor stays mounted while previewing, just hidden and
+                // disabled, so its cursor and scroll position survive.
                 PlainTextEditor(
                     text: $draft.text, fontSize: inputFontSize, scheme: effectiveScheme, autoFocusWhen: isActive
                 )
@@ -260,10 +307,9 @@ struct QuickCaptureView: View {
                 .disabled(isPreviewing)
 
                 if isPreviewing {
-                    // Includes the separator Save will append, so the preview
-                    // matches what actually lands in Craft.
                     CapturePreviewPane(
-                        text: draft.addSeparator && !draft.text.isEmpty ? draft.text + "\n\n*****" : draft.text,
+                        text: previewText,
+                        title: target == .newPage ? titleAndBody.title : nil,
                         fontSize: inputFontSize, scheme: effectiveScheme
                     )
                 }
@@ -272,8 +318,45 @@ struct QuickCaptureView: View {
         .padding(.top, 16)
     }
 
+    // MARK: - Destination fields
+
     @ViewBuilder
     private var destinationFields: some View {
+        FieldBox(scheme: effectiveScheme) {
+            MenuFieldPicker(
+                placeholder: "Choose where this goes",
+                options: CaptureTarget.allCases.map { (label: $0.rawValue, value: $0) },
+                noneValue: CaptureTarget.page,
+                selection: $draft.target, fontSize: inputFontSize, scheme: effectiveScheme
+            )
+        }
+
+        switch target {
+        case .page:
+            pageFields
+        case .newPage:
+            newPageFields
+        case .task:
+            taskFields
+        case .reflection:
+            hint("Adds to today's note in Craft.")
+        case .bits:
+            hint("Saves a new Bit.")
+        case .baserow:
+            hint("Pick a database and table above; fields appear here in the form.")
+        }
+    }
+
+    private func hint(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: inputFontSize))
+            .foregroundStyle(Theme.secondaryText(effectiveScheme))
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+    }
+
+    @ViewBuilder
+    private var pageFields: some View {
         FieldBox(scheme: effectiveScheme) {
             VStack(alignment: .leading, spacing: 0) {
                 if let selectedDoc {
@@ -288,17 +371,11 @@ struct QuickCaptureView: View {
                     }
                     .padding(12)
 
-                    // Sub-pages of whatever's selected — Craft's own
-                    // `documents list` never surfaces these (confirmed
-                    // live: a known sub-page title returned nothing from
-                    // it), only full-space `search` does, and that finds
-                    // sub-pages anywhere, with no sense of which one you
-                    // meant. Brandon's call: search for the parent by name
-                    // like today, then pick from what's directly inside it
-                    // — "99 times out of 100 I will know the parent page."
-                    // Hidden once a sub-page's been chosen (selectedDoc no
-                    // longer matches subPagesParentId) — one level deep,
-                    // not a recursive drill-down.
+                    // Sub-pages of whatever's selected: Craft's `documents
+                    // list` never surfaces these, only full-space `search`
+                    // does, with no sense of which one you meant. So: search
+                    // for the parent, then pick from what's directly inside
+                    // it. One level deep.
                     if isLoadingSubPages {
                         ProgressView().padding(.horizontal, 12).padding(.bottom, 12)
                     } else if !subPages.isEmpty && selectedDoc.id == subPagesParentId {
@@ -333,27 +410,25 @@ struct QuickCaptureView: View {
                         ProgressView().padding(12)
                     } else if !results.isEmpty {
                         Divider()
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 0) {
-                                ForEach(results) { doc in
-                                    Button {
-                                        selectedDoc = doc
-                                        Task { await loadSubPages(of: doc) }
-                                    } label: {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(doc.title).font(.system(size: inputFontSize))
-                                            if let folder = doc.folder {
-                                                Text(folder)
-                                                    .font(.system(size: inputFontSize))
-                                                    .foregroundStyle(.secondary)
-                                            }
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(results) { doc in
+                                Button {
+                                    selectedDoc = doc
+                                    Task { await loadSubPages(of: doc) }
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(doc.title).font(.system(size: inputFontSize))
+                                        if let folder = doc.folder {
+                                            Text(folder)
+                                                .font(.system(size: inputFontSize))
+                                                .foregroundStyle(.secondary)
                                         }
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
                                     }
-                                    .buttonStyle(.plain)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -361,16 +436,8 @@ struct QuickCaptureView: View {
             }
         }
 
-        // Craft-only — Baserow rows have no markdown/separator concept.
-        // Brandon adds a "*****" (regular-style) separator after nearly
-        // every Craft capture by hand, specifically for readability on the
-        // Departmental Meetings/1:1s sub-pages — this saves that manual
-        // step, on by default since that's his common case.
-        //
-        // Right-aligned (a leading Spacer, not the default leading-hugging
-        // Toggle layout) so it sits flush with the Save button's right
-        // edge below it — Brandon: left-aligned read as randomly centered
-        // relative to Save, not intentional.
+        // Brandon adds a "*****" separator after nearly every Craft capture
+        // by hand; this saves that step. Right-aligned to line up with Save.
         HStack {
             Spacer()
             Toggle("Add Separator", isOn: $draft.addSeparator)
@@ -378,28 +445,224 @@ struct QuickCaptureView: View {
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)
+    }
 
-        if let craftErrorMessage {
-            Text(craftErrorMessage)
-                .foregroundStyle(.red)
-                .font(.caption)
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-        }
+    private var folderResults: [CraftFolder] {
+        let q = folderQuery.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return allFolders }
+        return allFolders.filter { $0.path.lowercased().contains(q) }
+    }
 
-        HStack {
-            Spacer()
-            // "Save", not "Push" — Brandon's explicit rename for this
-            // button specifically (Baserow's own button below keeps
-            // "Push"/"Pushing…", not asked to change).
-            PillButton(systemImage: "arrow.up.circle", label: isCraftSubmitting ? "Saving…" : "Save") {
-                submitCraft()
+    @ViewBuilder
+    private var newPageFields: some View {
+        FieldBox(scheme: effectiveScheme) {
+            VStack(alignment: .leading, spacing: 0) {
+                if let selectedFolder {
+                    HStack {
+                        Text(selectedFolder.path).font(.system(size: inputFontSize))
+                        Spacer()
+                        Button("Change") { self.selectedFolder = nil }
+                            .font(.system(.footnote))
+                    }
+                    .padding(12)
+                } else {
+                    TextField("Search folders…", text: $folderQuery)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: inputFontSize))
+                        #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                        #endif
+                        .padding(12)
+                    if isLoadingFolders && allFolders.isEmpty {
+                        ProgressView().padding(12)
+                    } else if !folderResults.isEmpty {
+                        Divider()
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(folderResults) { folder in
+                                Button {
+                                    selectedFolder = folder
+                                } label: {
+                                    Text(folder.path)
+                                        .font(.system(size: inputFontSize))
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
             }
-            .disabled(draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                      || selectedDoc == nil || isCraftSubmitting)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
+        hint("The first line becomes the page's title.")
+    }
+
+    @ViewBuilder
+    private var taskFields: some View {
+        FieldLabel(title: "Due date (optional)")
+        FieldBox(scheme: effectiveScheme) {
+            VStack(alignment: .leading, spacing: 0) {
+                Toggle("Set a due date", isOn: $includeDueDate)
+                    .font(.system(size: inputFontSize))
+                    .padding(12)
+                if includeDueDate {
+                    Divider().padding(.leading, 12)
+                    DatePicker("Date", selection: $dueDate, displayedComponents: .date)
+                        .padding(12)
+                }
+            }
+        }
+        FieldLabel(title: "Inbox (optional)")
+        FieldBox(scheme: effectiveScheme) {
+            MenuFieldPicker(
+                placeholder: "Default (\(store.config.defaultInbox?.name ?? "Craft Inbox"))",
+                options: store.config.inboxes.map { (label: $0.name, value: Optional($0.id)) },
+                noneValue: Optional<String>.none,
+                selection: $taskInboxId, fontSize: inputFontSize, scheme: effectiveScheme
+            )
+        }
+    }
+
+    // MARK: - Saving
+
+    private func save() {
+        switch target {
+        case .page: submitCraft()
+        case .newPage: submitNewPage()
+        case .reflection: sendSimple("Reflection", saveReflection)
+        case .bits: sendSimple("Bits", saveBit)
+        case .task: submitTask()
+        case .baserow: break
+        }
+    }
+
+    private func flash(_ message: String) {
+        statusMessage = message
+        Task {
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            if statusMessage == message { statusMessage = nil }
+        }
+    }
+
+    /// One-off destinations (Bits, Reflection, Task) snap back to the default
+    /// destination afterward, so the next capture doesn't land there by
+    /// accident.
+    private func finishOneOff(_ message: String) {
+        draft.text = ""
+        flash(message)
+        draft.target = defaultTarget
+    }
+
+    private func sendSimple(_ label: String, _ operation: @escaping (String) async -> String?) {
+        let text = trimmedText
+        isCraftSubmitting = true
+        craftErrorMessage = nil
+        Task {
+            let failure = await operation(text)
+            isCraftSubmitting = false
+            if let failure {
+                craftErrorMessage = failure
+            } else {
+                finishOneOff("Sent to \(label)")
+            }
+        }
+    }
+
+    private func submitTask() {
+        let oneLine = trimmedText.split(whereSeparator: \.isNewline).joined(separator: " ")
+        let inbox = store.config.inboxes.first { $0.id == taskInboxId } ?? store.config.defaultInbox
+        store.addTask(text: oneLine, dueDate: includeDueDate ? dueDate : nil, destination: inbox)
+        includeDueDate = false
+        taskInboxId = nil
+        finishOneOff("Task added")
+    }
+
+    private func loadFolders() {
+        guard !isLoadingFolders, store.config.isConfigured else { return }
+        isLoadingFolders = true
+        Task {
+            defer { isLoadingFolders = false }
+            let client = CraftClient(url: store.config.craftLink)
+            guard let folders = try? await client.listFolders() else { return }
+            allFolders = folders
+        }
+    }
+
+    private func submitNewPage() {
+        guard let selectedFolder else { return }
+        let (title, body) = titleAndBody
+        isCraftSubmitting = true
+        craftErrorMessage = nil
+        let client = CraftClient(url: store.config.craftLink)
+        let folderId = selectedFolder.id
+        Task {
+            do {
+                // Reuse a page left over from an earlier attempt whose body
+                // append failed, rather than creating an empty duplicate.
+                let newId: String
+                if let pending = pendingPage, pending.title == title, pending.folderId == folderId {
+                    newId = pending.id
+                } else {
+                    newId = try await client.createDocument(title: title, folderId: folderId)
+                    pendingPage = (newId, title, folderId)
+                }
+                if !body.isEmpty {
+                    try await client.appendBlocks(pageId: newId, markdown: body)
+                }
+                pendingPage = nil
+                draft.text = ""
+                isCraftSubmitting = false
+                flash("Created “\(title)”")
+            } catch {
+                craftErrorMessage = error.localizedDescription
+                isCraftSubmitting = false
+            }
+        }
+    }
+
+    /// Fields the capture box's text can go into.
+    private var captureCandidates: [BaserowField] {
+        fields.filter { $0.type == "long_text" || $0.type == "text" }
+    }
+
+    /// The remembered field for this table, else the first long-text (then
+    /// single-line text) field that isn't a comments field — "My Comments"
+    /// on the Seneca table is rarely where a quote belongs.
+    private var captureField: BaserowField? {
+        let candidates = captureCandidates
+        if let tableId, let id = store.config.baserowCaptureFields[String(tableId)],
+           let remembered = candidates.first(where: { $0.id == id }) { return remembered }
+        func isComment(_ f: BaserowField) -> Bool { f.name.localizedCaseInsensitiveContains("comment") }
+        return candidates.first { $0.type == "long_text" && !isComment($0) }
+            ?? candidates.first { !isComment($0) }
+            ?? candidates.first
+    }
+
+    private var captureFieldBinding: Binding<Int> {
+        Binding(
+            get: { captureField?.id ?? -1 },
+            set: { newId in
+                guard let tableId, let new = captureCandidates.first(where: { $0.id == newId }) else { return }
+                // Move the text: take it out of the old field (if it's still
+                // exactly what we put there) and into the new one.
+                if let old = captureField, old.id != newId, textValues[old.id] == draft.text {
+                    textValues[old.id] = nil
+                }
+                store.config.baserowCaptureFields[String(tableId)] = newId
+                store.config.save()
+                if !trimmedText.isEmpty { textValues[new.id] = draft.text }
+            }
+        )
+    }
+
+    /// Typed text follows you into Baserow: it lands in the table's capture
+    /// field (see `captureField`) when that's still empty, and is cleared
+    /// from the capture box once the row is pushed.
+    private func carryDraftTextIntoForm() {
+        guard !trimmedText.isEmpty, let field = captureField,
+              (textValues[field.id] ?? "").isEmpty else { return }
+        textValues[field.id] = draft.text
     }
 
     private func submitCraft() {
@@ -430,11 +693,10 @@ struct QuickCaptureView: View {
                 let idToMarkUsed = subPagesParentId ?? selectedDoc.id
                 documentStore.markUsed(idToMarkUsed)
                 isCraftSubmitting = false
+                // The page stays selected so repeat captures to it are just
+                // type + Save; the collapsed bar always shows where it goes.
                 draft.text = ""
-                query = ""
-                self.selectedDoc = nil
-                subPages = []
-                draft.addSeparator = true
+                flash("Added to \(selectedDoc.title)")
             } catch {
                 if isClearlyOffline(error) {
                     // No connection: keep it on disk and clear the screen as
@@ -444,10 +706,7 @@ struct QuickCaptureView: View {
                     documentStore.markUsed(subPagesParentId ?? selectedDoc.id)
                     isCraftSubmitting = false
                     draft.text = ""
-                    query = ""
-                    self.selectedDoc = nil
-                    subPages = []
-                    draft.addSeparator = true
+                    flash("Offline: will send to \(selectedDoc.title) when you're back online")
                 } else {
                     craftErrorMessage = error.localizedDescription
                     isCraftSubmitting = false
@@ -512,6 +771,18 @@ struct QuickCaptureView: View {
                 HStack { Spacer(); ProgressView(); Spacer() }
                     .padding(.top, 20)
             } else if !fields.isEmpty {
+                // Only when there's text to place and a real choice to make.
+                if !trimmedText.isEmpty && captureCandidates.count > 1 {
+                    FieldLabel(title: "Your typed text goes in")
+                    FieldBox(scheme: effectiveScheme) {
+                        MenuFieldPicker(
+                            placeholder: "Choose a field",
+                            options: captureCandidates.map { (label: $0.name, value: $0.id) },
+                            noneValue: -1,
+                            selection: captureFieldBinding, fontSize: inputFontSize, scheme: effectiveScheme
+                        )
+                    }
+                }
                 ForEach(fields) { field in
                     fieldInput(for: field)
                 }
@@ -783,6 +1054,7 @@ struct QuickCaptureView: View {
                 if textValues[field.id] == nil { textValues[field.id] = arthur.value }
             }
         }
+        if target == .baserow { carryDraftTextIntoForm() }
     }
 
     // MARK: - Baserow submit
@@ -822,7 +1094,12 @@ struct QuickCaptureView: View {
         }
 
         do {
+            // Remember whether the capture box's text rode along into the
+            // form, so it can be cleared once it has actually been sent.
+            let carried = captureField
+                .flatMap { textValues[$0.id] }?.trimmingCharacters(in: .whitespacesAndNewlines)
             try await baserowClient.createRow(tableId: tableId, fields: payload)
+            if let carried, carried == trimmedText { draft.text = "" }
             store.config.lastBaserowDatabaseId = databaseId
             store.config.lastBaserowTableId = tableId
             store.config.save()

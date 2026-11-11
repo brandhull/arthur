@@ -512,7 +512,7 @@ public struct CraftClient {
         var seen = Set<String>()
         for folder in try await listFolders() {
             try await page(command: "documents list --folder \(folder.id)",
-                           folderName: folder.name, into: &docs, seen: &seen)
+                           folderName: folder.path, into: &docs, seen: &seen)
         }
         try await page(command: "documents list", folderName: nil, into: &docs, seen: &seen)
         return docs
@@ -544,15 +544,31 @@ public struct CraftClient {
     /// in, rather than an existing CraftDocument to append to).
     public func listFolders() async throws -> [CraftFolder] {
         let text = try await call(tool: "craft_read", command: "folders list")
-        let regex = try NSRegularExpression(pattern: #"<([0-9A-Fa-f-]+)>\s+(.+?)\s+\(\d+ docs?\)"#)
+        return Self.parseFolders(text)
+    }
+
+    /// Craft lists nested folders as indented bullets (two spaces per level),
+    /// and omits the "(N docs)" suffix on folders that are empty. Each folder
+    /// gets a `path` like "Personal / Blog / 02 Ready" so same-named
+    /// sub-folders stay distinguishable.
+    static func parseFolders(_ text: String) -> [CraftFolder] {
+        guard let regex = try? NSRegularExpression(
+            pattern: #"^(\s*)\*\s+<([0-9A-Fa-f-]+)>\s+(.+?)(?:\s+\(\d+ docs?\))?\s*$"#
+        ) else { return [] }
         var folders: [CraftFolder] = []
+        var stack: [String] = []
         for line in text.split(separator: "\n") {
             let s = String(line)
             let range = NSRange(s.startIndex..., in: s)
             guard let m = regex.firstMatch(in: s, range: range),
-                  let idR = Range(m.range(at: 1), in: s),
-                  let nameR = Range(m.range(at: 2), in: s) else { continue }
-            folders.append(CraftFolder(id: String(s[idR]), name: String(s[nameR])))
+                  let indentR = Range(m.range(at: 1), in: s),
+                  let idR = Range(m.range(at: 2), in: s),
+                  let nameR = Range(m.range(at: 3), in: s) else { continue }
+            let depth = s[indentR].count / 2
+            let name = String(s[nameR])
+            stack = Array(stack.prefix(depth))
+            stack.append(name)
+            folders.append(CraftFolder(id: String(s[idR]), name: name, path: stack.joined(separator: " / ")))
         }
         return folders
     }

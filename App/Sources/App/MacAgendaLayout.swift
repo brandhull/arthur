@@ -14,10 +14,7 @@ import ArthurKit
 struct MacAgendaLayout<Content: View>: View {
     @ObservedObject var store: TaskStore
     @Binding var selectedTab: HomeTab
-    @Binding var quickCaptureSource: QuickCaptureSource
     @Binding var showingSettings: Bool
-    @Binding var showingAddTask: Bool
-    @Binding var showingQuickAdd: Bool
     /// Markdown preview toggle for the capture screens — the button only
     /// shows while one of them is on screen (`previewAvailable`).
     @Binding var isPreviewing: Bool
@@ -29,21 +26,19 @@ struct MacAgendaLayout<Content: View>: View {
     // the cross-device Config/iCloud-KVS system: nothing here needs to sync
     // across devices, and mixing single-window layout state into Config
     // would just add sync-conflict surface for no benefit.
-    @AppStorage("sidebarCollapsed") private var sidebarCollapsed = false
+    // Starts closed on every launch: the app opens straight into Quick Capture.
+    @State private var sidebarCollapsed = true
 
     init(
-        store: TaskStore, selectedTab: Binding<HomeTab>, quickCaptureSource: Binding<QuickCaptureSource>,
-        showingSettings: Binding<Bool>, showingAddTask: Binding<Bool>, showingQuickAdd: Binding<Bool>,
+        store: TaskStore, selectedTab: Binding<HomeTab>,
+        showingSettings: Binding<Bool>,
         isPreviewing: Binding<Bool>, previewAvailable: Bool,
         effectiveScheme: ColorScheme,
         @ViewBuilder content: () -> Content
     ) {
         self.store = store
         self._selectedTab = selectedTab
-        self._quickCaptureSource = quickCaptureSource
         self._showingSettings = showingSettings
-        self._showingAddTask = showingAddTask
-        self._showingQuickAdd = showingQuickAdd
         self._isPreviewing = isPreviewing
         self.previewAvailable = previewAvailable
         self.effectiveScheme = effectiveScheme
@@ -78,9 +73,8 @@ struct MacAgendaLayout<Content: View>: View {
             ZStack(alignment: .topLeading) {
                 Theme.background(effectiveScheme)
                 SidebarView(
-                    store: store, selectedTab: $selectedTab, quickCaptureSource: $quickCaptureSource,
+                    store: store, selectedTab: $selectedTab,
                     isCollapsed: $sidebarCollapsed, showingSettings: $showingSettings,
-                    showingAddTask: $showingAddTask, showingQuickAdd: $showingQuickAdd,
                     effectiveScheme: effectiveScheme
                 )
                 .background(

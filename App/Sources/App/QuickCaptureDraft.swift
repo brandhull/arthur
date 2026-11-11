@@ -10,10 +10,23 @@ import Foundation
 /// reverted to local state since QuickCaptureView is already never
 /// destroyed/recreated across tab switches (the opacity-swap pattern), so
 /// there's no behavior difference either way — just no reason to churn it.
+/// Where the Quick Capture screen sends what you've typed. The Destination
+/// card at the bottom of the screen switches between these.
+enum CaptureTarget: String, CaseIterable, Identifiable {
+    case bits = "Bits"
+    case newPage = "New Craft Page"
+    case page = "Append Craft Page"
+    case task = "New Craft Task"
+    case reflection = "Reflection"
+    case baserow = "Baserow"
+    var id: String { rawValue }
+}
+
 @MainActor
 final class QuickCaptureDraft: ObservableObject {
     @Published var text = ""
     @Published var addSeparator = true
+    @Published var target: CaptureTarget = .page
 
     func reset() {
         text = ""

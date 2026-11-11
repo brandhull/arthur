@@ -13,7 +13,6 @@ import ArthurKit
 /// description of this drawer's contents.
 struct iOSSidebarDrawer: View {
     @Binding var selectedTab: HomeTab
-    @Binding var quickCaptureSource: QuickCaptureSource
     @Binding var showingSettings: Bool
     @Binding var isPresented: Bool
     let width: CGFloat
@@ -37,7 +36,7 @@ struct iOSSidebarDrawer: View {
             // landscape sidebar already have correct spacing from their
             // own chrome and shouldn't also pick this up.
             SidebarNavList(
-                selectedTab: $selectedTab, quickCaptureSource: $quickCaptureSource,
+                selectedTab: $selectedTab,
                 showingSettings: $showingSettings, effectiveScheme: effectiveScheme
             )
             .padding(.top, 60)
@@ -56,7 +55,6 @@ struct iOSSidebarDrawer: View {
         // specific behavior; Mac's sidebar and the iPad landscape sidebar
         // don't need this at all since they're always visible.
         .onChange(of: selectedTab) { isPresented = false }
-        .onChange(of: quickCaptureSource) { isPresented = false }
         .onChange(of: showingSettings) {
             if showingSettings { isPresented = false }
         }

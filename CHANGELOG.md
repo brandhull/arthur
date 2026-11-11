@@ -5,6 +5,30 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-11
+
+### Changed
+- One capture screen. The Destination card at the bottom now chooses where
+  the text goes: Append Craft Page (search, with sub-pages), New Craft Page in
+  any folder or sub-folder, Reflection, Bits, a Craft task, or Baserow. The
+  collapsed bar shows the current target. Save sits above the card.
+- A Craft page stays selected after Save; Bits, Reflection and task snap back
+  to Craft page after sending.
+- Settings has a "Quick Capture opens to" choice: which destination the app
+  starts on and returns to after a one-off send (default: Append Craft Page).
+- Baserow: typed text carries into a text field of your choice (remembered per
+  table; defaults to one that isn't a "comments" field).
+- The sidebar starts closed and lists Quick Capture, Rocks, Bits, Tasks,
+  Reflection (no Craft/Baserow sub-rows).
+
+### Removed
+- Both "New" buttons (sidebar and the iPhone floating button), the New menu,
+  and the separate Bits / Reflection / Document capture screens.
+
+### Fixed
+- Craft folders with no document count (e.g. Blog and its sub-folders) were
+  missing from folder lists; nested folders now show as "Parent / Child".
+
 ## [1.4.0] - 2026-11-09
 
 ### Added

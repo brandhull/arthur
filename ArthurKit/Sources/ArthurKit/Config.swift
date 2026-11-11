@@ -52,6 +52,13 @@ public struct Config: Codable {
     /// Bits web app uses).
     public var bitsDatabaseId: Int?
     public var bitsTableId: Int?
+    /// Which Baserow field the Quick Capture text box's text goes into, per
+    /// table (key: table id as a string, value: field id). Chosen once in the
+    /// form; tables without an entry fall back to a sensible default.
+    public var baserowCaptureFields: [String: Int]
+    /// Raw name of the Quick Capture destination the app opens to (and returns
+    /// to after a one-off send). nil means "Append Craft Page".
+    public var defaultCaptureTarget: String?
     /// Cached rootBlockId for the "Rocks" doc in the "Personal" folder —
     /// resolved once via CraftClient.resolveDocument(title:folder:) rather
     /// than re-searching the folder on every launch. Cleared and re-resolved
@@ -78,12 +85,15 @@ public struct Config: Codable {
                 senecaDatabaseId: Int? = nil, senecaTableId: Int? = nil,
                 senecaQuoteField: String = "Quote", senecaAuthorField: String = "Author",
                 bitsDatabaseId: Int? = nil, bitsTableId: Int? = nil,
+                baserowCaptureFields: [String: Int] = [:], defaultCaptureTarget: String? = nil,
                 rocksDocumentId: String? = nil, pinOnTop: Bool = false,
                 lastModified: Date = .distantPast) {
         self.craftLink = craftLink
         self.inboxes = inboxes
         self.defaultInboxId = defaultInboxId
         self.baserowToken = baserowToken
+        self.baserowCaptureFields = baserowCaptureFields
+        self.defaultCaptureTarget = defaultCaptureTarget
         self.baserowDatabases = baserowDatabases
         self.lastBaserowDatabaseId = lastBaserowDatabaseId
         self.lastBaserowTableId = lastBaserowTableId
@@ -111,6 +121,8 @@ public struct Config: Codable {
         // property below, which is why it's excluded from CodingKeys/this
         // custom decoder entirely.
         baserowToken = try c.decodeIfPresent(String.self, forKey: .baserowToken) ?? ""
+        baserowCaptureFields = try c.decodeIfPresent([String: Int].self, forKey: .baserowCaptureFields) ?? [:]
+        defaultCaptureTarget = try c.decodeIfPresent(String.self, forKey: .defaultCaptureTarget)
         baserowDatabases = try c.decodeIfPresent([BaserowDatabase].self, forKey: .baserowDatabases) ?? []
         lastBaserowDatabaseId = try c.decodeIfPresent(Int.self, forKey: .lastBaserowDatabaseId)
         lastBaserowTableId = try c.decodeIfPresent(Int.self, forKey: .lastBaserowTableId)

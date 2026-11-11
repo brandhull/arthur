@@ -17,10 +17,7 @@ import ArthurKit
 struct iOSAgendaLayout<Content: View>: View {
     @ObservedObject var store: TaskStore
     @Binding var selectedTab: HomeTab
-    @Binding var quickCaptureSource: QuickCaptureSource
     @Binding var showingSettings: Bool
-    @Binding var showingAddTask: Bool
-    @Binding var showingQuickAdd: Bool
     /// Markdown preview toggle for the capture screens — the button only
     /// shows while one of them is on screen (`previewAvailable`).
     @Binding var isPreviewing: Bool
@@ -34,23 +31,21 @@ struct iOSAgendaLayout<Content: View>: View {
     // device, so there's no cross-device sync concern, and there's no
     // reason for iPad's landscape sidebar to remember collapse state
     // separately from what Mac would use on the same account.
-    @AppStorage("sidebarCollapsed") private var sidebarCollapsed = false
+    // Starts closed on every launch (the app opens into Quick Capture).
+    @State private var sidebarCollapsed = true
     // Transient, not persisted — a drawer starts closed every time, same as
     // any standard hamburger menu.
     @State private var showingDrawer = false
 
     init(
-        store: TaskStore, selectedTab: Binding<HomeTab>, quickCaptureSource: Binding<QuickCaptureSource>,
-        showingSettings: Binding<Bool>, showingAddTask: Binding<Bool>, showingQuickAdd: Binding<Bool>,
+        store: TaskStore, selectedTab: Binding<HomeTab>,
+        showingSettings: Binding<Bool>,
         isPreviewing: Binding<Bool>, previewAvailable: Bool,
         effectiveScheme: ColorScheme, @ViewBuilder content: () -> Content
     ) {
         self.store = store
         self._selectedTab = selectedTab
-        self._quickCaptureSource = quickCaptureSource
         self._showingSettings = showingSettings
-        self._showingAddTask = showingAddTask
-        self._showingQuickAdd = showingQuickAdd
         self._isPreviewing = isPreviewing
         self.previewAvailable = previewAvailable
         self.effectiveScheme = effectiveScheme
@@ -72,9 +67,8 @@ struct iOSAgendaLayout<Content: View>: View {
                 HStack(spacing: 0) {
                     if !sidebarCollapsed {
                         iPadLandscapeSidebar(
-                            store: store, selectedTab: $selectedTab, quickCaptureSource: $quickCaptureSource,
+                            store: store, selectedTab: $selectedTab,
                             isCollapsed: $sidebarCollapsed, showingSettings: $showingSettings,
-                            showingAddTask: $showingAddTask, showingQuickAdd: $showingQuickAdd,
                             effectiveScheme: effectiveScheme
                         )
                         .padding(.vertical, Theme.sidebarCardInset)
@@ -99,7 +93,7 @@ struct iOSAgendaLayout<Content: View>: View {
 
                     if showingDrawer {
                         iOSSidebarDrawer(
-                            selectedTab: $selectedTab, quickCaptureSource: $quickCaptureSource,
+                            selectedTab: $selectedTab,
                             showingSettings: $showingSettings, isPresented: $showingDrawer,
                             width: geo.size.width * 0.75, effectiveScheme: effectiveScheme
                         )
@@ -176,24 +170,6 @@ struct iOSAgendaLayout<Content: View>: View {
                 .font(.system(size: Theme.sectionHeadingSize, weight: Theme.headingWeight))
 
             Spacer()
-
-            // iPad portrait only — iPhone's quick-add is AgendaView's
-            // floating button instead, per Brandon's explicit split.
-            // Presentation lives at AgendaView's top level now
-            // (CenteredModal, mounted once, shared by every platform) — this
-            // button just flips the shared showingQuickAdd flag instead of
-            // anchoring its own popover.
-            if horizontalSizeClass == .regular {
-                Button {
-                    showingQuickAdd = true
-                } label: {
-                    Image(systemName: "bubble.and.pencil")
-                        .font(.system(size: Theme.topBarIconSize))
-                        .frame(width: Theme.topBarIconFrame, height: Theme.topBarIconFrame)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
 
             previewButton
 

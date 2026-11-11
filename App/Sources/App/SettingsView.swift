@@ -53,6 +53,7 @@ struct SettingsView: View {
 
     @State private var inboxes: [InboxDestination] = []
     @State private var defaultInboxId: String?
+    @State private var defaultCaptureTarget: String = CaptureTarget.page.rawValue
     @State private var newInboxName = ""
     @State private var newInboxURL = ""
     @State private var isResolving = false
@@ -223,6 +224,16 @@ struct SettingsView: View {
                             )
                             #endif
                         }
+                    }
+
+                    FieldLabel(title: "Quick Capture opens to")
+                    FieldBox(scheme: effectiveScheme) {
+                        MenuFieldPicker(
+                            placeholder: CaptureTarget.page.rawValue,
+                            options: CaptureTarget.allCases.map { (label: $0.rawValue, value: $0.rawValue) },
+                            noneValue: CaptureTarget.page.rawValue,
+                            selection: $defaultCaptureTarget, fontSize: Theme.inputFontSize(), scheme: effectiveScheme
+                        )
                     }
 
                     FieldLabel(title: "Baserow connection")
@@ -546,6 +557,7 @@ struct SettingsView: View {
         craftLink = store.config.craftLink
         inboxes = store.config.inboxes
         defaultInboxId = store.config.defaultInboxId
+        defaultCaptureTarget = store.config.defaultCaptureTarget ?? CaptureTarget.page.rawValue
         baserowToken = store.config.baserowToken
         baserowDatabases = store.config.baserowDatabases
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -627,6 +639,7 @@ struct SettingsView: View {
         store.config.craftLink = craftLink
         store.config.inboxes = inboxes
         store.config.defaultInboxId = defaultInboxId
+        store.config.defaultCaptureTarget = defaultCaptureTarget == CaptureTarget.page.rawValue ? nil : defaultCaptureTarget
         store.config.baserowToken = baserowToken
         // If the last-used database was deleted from the list above, clear
         // the remembered selection so BaserowCaptureView doesn't try to load

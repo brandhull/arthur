@@ -13,11 +13,8 @@ import ArthurKit
 struct SidebarView: View {
     @ObservedObject var store: TaskStore
     @Binding var selectedTab: HomeTab
-    @Binding var quickCaptureSource: QuickCaptureSource
     @Binding var isCollapsed: Bool
     @Binding var showingSettings: Bool
-    @Binding var showingAddTask: Bool
-    @Binding var showingQuickAdd: Bool
     let effectiveScheme: ColorScheme
 
     var body: some View {
@@ -34,30 +31,13 @@ struct SidebarView: View {
                 .buttonStyle(.plain)
 
                 Spacer()
-
-                // Presentation lives at AgendaView's top level now
-                // (CenteredModal, mounted once, shared by every platform) —
-                // this button just flips the shared showingQuickAdd flag
-                // instead of anchoring its own popover, which used to
-                // render outside the window entirely at certain sidebar
-                // widths (NSPopover positions relative to the screen, not
-                // the parent window, and doesn't clip to its bounds).
-                Button {
-                    showingQuickAdd = true
-                } label: {
-                    Image(systemName: "bubble.and.pencil")
-                        .font(.system(size: 15))
-                        .frame(width: 28, height: 28)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, 14)
             .padding(.top, 14)
             .padding(.bottom, 10)
 
             SidebarNavList(
-                selectedTab: $selectedTab, quickCaptureSource: $quickCaptureSource,
+                selectedTab: $selectedTab,
                 showingSettings: $showingSettings, effectiveScheme: effectiveScheme
             )
         }

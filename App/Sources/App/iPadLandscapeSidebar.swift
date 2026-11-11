@@ -13,11 +13,8 @@ import ArthurKit
 struct iPadLandscapeSidebar: View {
     @ObservedObject var store: TaskStore
     @Binding var selectedTab: HomeTab
-    @Binding var quickCaptureSource: QuickCaptureSource
     @Binding var isCollapsed: Bool
     @Binding var showingSettings: Bool
-    @Binding var showingAddTask: Bool
-    @Binding var showingQuickAdd: Bool
     let effectiveScheme: ColorScheme
 
     var body: some View {
@@ -34,27 +31,13 @@ struct iPadLandscapeSidebar: View {
                 .buttonStyle(.plain)
 
                 Spacer()
-
-                // Presentation lives at AgendaView's top level now
-                // (CenteredModal, mounted once, shared by every platform) —
-                // this button just flips the shared showingQuickAdd flag
-                // instead of anchoring its own popover.
-                Button {
-                    showingQuickAdd = true
-                } label: {
-                    Image(systemName: "bubble.and.pencil")
-                        .font(.system(size: Theme.menuIconSize))
-                        .frame(width: Theme.menuIconFrame, height: Theme.menuIconFrame)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, 14)
             .padding(.top, 14)
             .padding(.bottom, 10)
 
             SidebarNavList(
-                selectedTab: $selectedTab, quickCaptureSource: $quickCaptureSource,
+                selectedTab: $selectedTab,
                 showingSettings: $showingSettings, effectiveScheme: effectiveScheme
             )
         }

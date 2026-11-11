@@ -13,7 +13,6 @@ import ArthurKit
 /// of this view at all.
 struct SidebarNavList: View {
     @Binding var selectedTab: HomeTab
-    @Binding var quickCaptureSource: QuickCaptureSource
     @Binding var showingSettings: Bool
     let effectiveScheme: ColorScheme
 
@@ -39,6 +38,9 @@ struct SidebarNavList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
+                navRow(title: HomeTab.quickCapture.rawValue, isActive: selectedTab == .quickCapture) {
+                    selectedTab = .quickCapture
+                }
                 navRow(title: HomeTab.rocks.rawValue, isActive: selectedTab == .rocks) {
                     selectedTab = .rocks
                 }
@@ -48,45 +50,6 @@ struct SidebarNavList: View {
                 navRow(title: HomeTab.tasks.rawValue, isActive: selectedTab == .tasks) {
                     selectedTab = .tasks
                 }
-
-                // Quick Capture: a non-interactive section label with two
-                // indented, independently-selectable rows beneath it
-                // (Craft/Baserow) — its content is always one or the other,
-                // never an undifferentiated third state, so the parent label
-                // itself doesn't need to be tappable. Same font/size/color as
-                // every other nav row (Brandon: all sidebar text should read
-                // as one uniform style, not a visually distinct section
-                // header) — only the missing dot and disabled tap tell it
-                // apart from an active/inactive leaf row. Same fixed 30pt
-                // row height too, not its own top/bottom padding — that
-                // used to make the gap above it (from Tasks) read as 12pt
-                // while the gap below it (to Craft) read as only 4pt, so
-                // Craft looked oddly "closer" to the label than every other
-                // row is to its neighbor. Every row-to-row gap is now
-                // exactly the same, set purely by this VStack's own
-                // `spacing: 2`.
-                Text(HomeTab.quickCapture.rawValue)
-                    .font(.system(size: navFontSize, weight: .regular))
-                    .foregroundStyle(Theme.primary(effectiveScheme))
-                    .padding(.horizontal, 14)
-                    .frame(height: navRowHeight)
-                navRow(
-                    title: QuickCaptureSource.craft.rawValue,
-                    isActive: selectedTab == .quickCapture && quickCaptureSource == .craft,
-                    indent: true
-                ) {
-                    selectedTab = .quickCapture
-                    quickCaptureSource = .craft
-                }
-                navRow(
-                    title: QuickCaptureSource.baserow.rawValue,
-                    isActive: selectedTab == .quickCapture && quickCaptureSource == .baserow,
-                    indent: true
-                ) {
-                    selectedTab = .quickCapture
-                    quickCaptureSource = .baserow
-                }
-
                 navRow(title: HomeTab.reflection.rawValue, isActive: selectedTab == .reflection) {
                     selectedTab = .reflection
                 }
