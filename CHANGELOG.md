@@ -5,6 +5,14 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-11
+
+### Changed
+- The collapsed Destination bar stays on one line: the "Destination" label
+  never wraps, the description truncates in the middle, and a new page shows
+  just its folder's name. With nothing chosen it shows only the destination
+  type (no "choose a page" hint). Long page and folder rows truncate too.
+
 ## [1.5.0] - 2026-11-11
 
 ### Changed

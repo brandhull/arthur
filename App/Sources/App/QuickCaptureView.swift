@@ -155,8 +155,8 @@ struct QuickCaptureView: View {
     /// What the collapsed Destination bar shows next to its title.
     private var destinationSummary: String {
         switch target {
-        case .page: return selectedDoc.map { "Append · " + $0.title } ?? "Append Craft Page · choose a page"
-        case .newPage: return "New Craft Page · " + (selectedFolder?.path ?? "choose a folder")
+        case .page: return selectedDoc.map { "Append · " + $0.title } ?? "Append Craft Page"
+        case .newPage: return selectedFolder.map { "New Craft Page · " + $0.name } ?? "New Craft Page"
         case .reflection: return "Reflection"
         case .bits: return "Bits"
         case .task: return "New Craft Task"
@@ -261,15 +261,21 @@ struct QuickCaptureView: View {
             withAnimation(.easeInOut(duration: 0.15)) { isDestinationExpanded.toggle() }
         } label: {
             HStack(spacing: 10) {
+                // The label never shrinks or wraps; only the description
+                // after it gives way (single line, ellipsis in the middle).
                 Text("Destination")
                     .font(.system(size: Theme.inputFontSize(), weight: Theme.headingWeight))
                     .foregroundStyle(Color.primary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .layoutPriority(2)
                 Spacer(minLength: 8)
                 Text(destinationSummary)
                     .font(.system(size: Theme.inputFontSize()))
                     .foregroundStyle(Theme.secondaryText(effectiveScheme))
                     .lineLimit(1)
                     .truncationMode(.middle)
+                    .layoutPriority(1)
                 Image(systemName: isDestinationExpanded ? "chevron.down" : "chevron.up")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.secondaryText(effectiveScheme))
@@ -361,7 +367,7 @@ struct QuickCaptureView: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let selectedDoc {
                     HStack {
-                        Text(selectedDoc.title).font(.system(size: inputFontSize))
+                        Text(selectedDoc.title).font(.system(size: inputFontSize)).lineLimit(1).truncationMode(.middle)
                         Spacer()
                         Button("Change") {
                             self.selectedDoc = nil
@@ -417,9 +423,11 @@ struct QuickCaptureView: View {
                                     Task { await loadSubPages(of: doc) }
                                 } label: {
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(doc.title).font(.system(size: inputFontSize))
+                                        Text(doc.title).font(.system(size: inputFontSize)).lineLimit(1)
                                         if let folder = doc.folder {
                                             Text(folder)
+                                                .lineLimit(1)
+                                                .truncationMode(.middle)
                                                 .font(.system(size: inputFontSize))
                                                 .foregroundStyle(.secondary)
                                         }
@@ -459,7 +467,7 @@ struct QuickCaptureView: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let selectedFolder {
                     HStack {
-                        Text(selectedFolder.path).font(.system(size: inputFontSize))
+                        Text(selectedFolder.path).font(.system(size: inputFontSize)).lineLimit(1).truncationMode(.middle)
                         Spacer()
                         Button("Change") { self.selectedFolder = nil }
                             .font(.system(.footnote))
@@ -484,6 +492,8 @@ struct QuickCaptureView: View {
                                 } label: {
                                     Text(folder.path)
                                         .font(.system(size: inputFontSize))
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 6)
