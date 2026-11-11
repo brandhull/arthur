@@ -5,6 +5,14 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-11-11
+
+### Changed
+- iPhone: the Destination bar and picker use short names (Bits, New Page,
+  Append Page, New Task, Reflection, Baserow). The destination type never
+  truncates; a chosen page, folder or table follows it and gives way first.
+  Mac and iPad keep the full names.
+
 ## [1.5.1] - 2026-11-11
 
 ### Changed

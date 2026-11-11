@@ -152,17 +152,28 @@ struct QuickCaptureView: View {
         }
     }
 
-    /// What the collapsed Destination bar shows next to its title.
-    private var destinationSummary: String {
+    /// iPhone only: the narrow Destination bar and picker use short names.
+    private var useShortNames: Bool {
+        #if os(iOS)
+        return horizontalSizeClass == .compact
+        #else
+        return false
+        #endif
+    }
+
+    private func name(_ target: CaptureTarget) -> String {
+        useShortNames ? target.shortName : target.rawValue
+    }
+
+    /// What the collapsed Destination bar shows next to its title: the
+    /// destination type (never truncated) and, once chosen, the page / folder
+    /// / table after it (this is the part that gives way when space is tight).
+    private var summaryDetail: String? {
         switch target {
-        case .page: return selectedDoc.map { "Append · " + $0.title } ?? "Append Craft Page"
-        case .newPage: return selectedFolder.map { "New Craft Page · " + $0.name } ?? "New Craft Page"
-        case .reflection: return "Reflection"
-        case .bits: return "Bits"
-        case .task: return "New Craft Task"
-        case .baserow:
-            let table = tables.first(where: { $0.id == tableId })?.name
-            return "Baserow" + (table.map { " · \($0)" } ?? "")
+        case .page: return selectedDoc?.title
+        case .newPage: return selectedFolder?.name
+        case .baserow: return tables.first(where: { $0.id == tableId })?.name
+        default: return nil
         }
     }
 
@@ -270,12 +281,19 @@ struct QuickCaptureView: View {
                     .fixedSize(horizontal: true, vertical: false)
                     .layoutPriority(2)
                 Spacer(minLength: 8)
-                Text(destinationSummary)
-                    .font(.system(size: Theme.inputFontSize()))
-                    .foregroundStyle(Theme.secondaryText(effectiveScheme))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .layoutPriority(1)
+                HStack(spacing: 0) {
+                    Text(name(target))
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                    if let detail = summaryDetail {
+                        Text(" · " + detail)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                }
+                .font(.system(size: Theme.inputFontSize()))
+                .foregroundStyle(Theme.secondaryText(effectiveScheme))
+                .layoutPriority(1)
                 Image(systemName: isDestinationExpanded ? "chevron.down" : "chevron.up")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.secondaryText(effectiveScheme))
@@ -331,7 +349,7 @@ struct QuickCaptureView: View {
         FieldBox(scheme: effectiveScheme) {
             MenuFieldPicker(
                 placeholder: "Choose where this goes",
-                options: CaptureTarget.allCases.map { (label: $0.rawValue, value: $0) },
+                options: CaptureTarget.allCases.map { (label: name($0), value: $0) },
                 noneValue: CaptureTarget.page,
                 selection: $draft.target, fontSize: inputFontSize, scheme: effectiveScheme
             )

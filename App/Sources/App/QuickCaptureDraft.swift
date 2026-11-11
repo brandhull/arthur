@@ -20,6 +20,16 @@ enum CaptureTarget: String, CaseIterable, Identifiable {
     case reflection = "Reflection"
     case baserow = "Baserow"
     var id: String { rawValue }
+
+    /// Shorter names for the iPhone's narrow Destination bar and picker.
+    var shortName: String {
+        switch self {
+        case .newPage: return "New Page"
+        case .page: return "Append Page"
+        case .task: return "New Task"
+        default: return rawValue
+        }
+    }
 }
 
 @MainActor
