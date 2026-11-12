@@ -5,6 +5,8 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-11
+
 ### Added
 - Offline queue, stage 2: New Craft Page, Craft tasks and Baserow rows now
   queue when the device is clearly offline, like Bits, Reflection and Append
