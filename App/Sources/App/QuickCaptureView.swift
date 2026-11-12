@@ -600,10 +600,31 @@ struct QuickCaptureView: View {
     private func submitTask() {
         let oneLine = trimmedText.split(whereSeparator: \.isNewline).joined(separator: " ")
         let inbox = store.config.inboxes.first { $0.id == taskInboxId } ?? store.config.defaultInbox
-        store.addTask(text: oneLine, dueDate: includeDueDate ? dueDate : nil, destination: inbox)
-        includeDueDate = false
-        taskInboxId = nil
-        finishOneOff("Task added")
+        let due = includeDueDate ? dueDate : nil
+        isCraftSubmitting = true
+        craftErrorMessage = nil
+        Task {
+            func finished(_ message: String) {
+                isCraftSubmitting = false
+                includeDueDate = false
+                taskInboxId = nil
+                finishOneOff(message)
+            }
+            do {
+                if !outbox.isOnline { throw URLError(.notConnectedToInternet) }
+                try await store.addTaskNow(text: oneLine, dueDate: due, destination: inbox)
+                finished("Task added")
+            } catch {
+                if isClearlyOffline(error) {
+                    outbox.enqueue(OutboxItem(kind: .task, text: oneLine,
+                                              dueDay: due.map { TaskStore.isoDay($0) }, inboxId: inbox?.id))
+                    finished("Offline: task will be added when you're back online")
+                } else {
+                    isCraftSubmitting = false
+                    craftErrorMessage = error.localizedDescription
+                }
+            }
+        }
     }
 
     private func loadFolders() {
@@ -626,6 +647,7 @@ struct QuickCaptureView: View {
         let folderId = selectedFolder.id
         Task {
             do {
+                if !outbox.isOnline && pendingPage == nil { throw URLError(.notConnectedToInternet) }
                 // Reuse a page left over from an earlier attempt whose body
                 // append failed, rather than creating an empty duplicate.
                 let newId: String
@@ -643,8 +665,18 @@ struct QuickCaptureView: View {
                 isCraftSubmitting = false
                 flash("Created “\(title)”")
             } catch {
-                craftErrorMessage = error.localizedDescription
-                isCraftSubmitting = false
+                if isClearlyOffline(error) {
+                    // Queue it, resuming from the page if it was already created.
+                    outbox.enqueue(OutboxItem(kind: .newPage, text: body, title: title, folderId: folderId,
+                                              createdPageId: pendingPage?.id))
+                    pendingPage = nil
+                    draft.text = ""
+                    isCraftSubmitting = false
+                    flash("Offline: “\(title)” will be created when you're back online")
+                } else {
+                    craftErrorMessage = error.localizedDescription
+                    isCraftSubmitting = false
+                }
             }
         }
     }
@@ -1126,13 +1158,26 @@ struct QuickCaptureView: View {
             // form, so it can be cleared once it has actually been sent.
             let carried = captureField
                 .flatMap { textValues[$0.id] }?.trimmingCharacters(in: .whitespacesAndNewlines)
-            try await baserowClient.createRow(tableId: tableId, fields: payload)
+            var queued = false
+            do {
+                if !outbox.isOnline { throw URLError(.notConnectedToInternet) }
+                try await baserowClient.createRow(tableId: tableId, fields: payload)
+            } catch {
+                guard isClearlyOffline(error), let json = try? JSONSerialization.data(withJSONObject: payload) else {
+                    throw error
+                }
+                let summary = payload.values.compactMap { $0 as? String }.joined(separator: " · ")
+                outbox.enqueue(OutboxItem(kind: .baserow, text: summary.isEmpty ? "Baserow row" : summary,
+                                          tableId: tableId, fieldsJSON: json))
+                queued = true
+            }
             if let carried, carried == trimmedText { draft.text = "" }
             store.config.lastBaserowDatabaseId = databaseId
             store.config.lastBaserowTableId = tableId
             store.config.save()
             clearFieldValues()
             applyFieldDefaults()
+            if queued { baserowErrorMessage = "Offline: saved, will push when you're back online." }
         } catch {
             baserowErrorMessage = error.localizedDescription
         }

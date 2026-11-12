@@ -161,6 +161,18 @@ private struct UITextViewBridge: UIViewRepresentable {
         view.delegate = context.coordinator
         view.text = text
         Self.applyBulletIndent(view)
+        // Putting the keyboard away: dragging the text down dismisses it, and
+        // a button above the keyboard does the same on demand.
+        view.keyboardDismissMode = .interactive
+        let toolbar = UIToolbar(frame: CGRect(x: 0, y: 0, width: 0, height: 44))
+        toolbar.items = [
+            UIBarButtonItem(systemItem: .flexibleSpace),
+            UIBarButtonItem(
+                image: UIImage(systemName: "keyboard.chevron.compact.down"),
+                primaryAction: UIAction { [weak view] _ in view?.resignFirstResponder() }
+            )
+        ]
+        view.inputAccessoryView = toolbar
         return view
     }
 

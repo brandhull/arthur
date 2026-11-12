@@ -237,6 +237,7 @@ struct AgendaView: View {
                 Task { @MainActor in
                     if kinds.contains(.bit) { await bits.load(store.config) }
                     if kinds.contains(.reflection) { await store.loadDailyNote() }
+                    if kinds.contains(.task) { await store.refresh() }
                 }
             }
             await outbox.drain()

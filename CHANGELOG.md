@@ -5,6 +5,15 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+### Added
+- Offline queue, stage 2: New Craft Page, Craft tasks and Baserow rows now
+  queue when the device is clearly offline, like Bits, Reflection and Append
+  Page. A new page that was created but whose body didn't land resumes on the
+  same page instead of creating a duplicate. A task that fails for another
+  reason now keeps its text on screen with the error, instead of vanishing.
+- iPhone: a keyboard-down button above the keyboard in the capture text box,
+  and dragging the text down dismisses the keyboard.
+
 ## [1.5.2] - 2026-11-11
 
 ### Changed

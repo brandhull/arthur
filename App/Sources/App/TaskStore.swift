@@ -237,18 +237,14 @@ final class TaskStore: ObservableObject {
         }
     }
 
-    func addTask(text: String, dueDate: Date?, destination: InboxDestination?) {
+    /// Adds a task and refreshes. Throws on failure so the caller can keep the
+    /// text (or queue it when the device is offline).
+    func addTaskNow(text: String, dueDate: Date?, destination: InboxDestination?) async throws {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         let schedule = dueDate.map { Self.isoDay($0) }
-        Task {
-            do {
-                try await client.addTask(markdown: text, schedule: schedule, deadline: nil,
-                                          destinationBlockId: destination?.id)
-                await refresh()
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-        }
+        try await client.addTask(markdown: text, schedule: schedule, deadline: nil,
+                                 destinationBlockId: destination?.id)
+        await refresh()
     }
 
     static func isoDay(_ date: Date) -> String {

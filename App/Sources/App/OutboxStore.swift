@@ -66,6 +66,12 @@ final class OutboxStore: ObservableObject {
         if !delivered.isEmpty { onDelivered?(delivered) }
     }
 
+    private func record(createdPageId: String?, for id: UUID) {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        items[index].createdPageId = createdPageId
+        OutboxStorage.save(items)
+    }
+
     private func send(_ item: OutboxItem, config: Config) async throws {
         switch item.kind {
         case .bit:
@@ -78,6 +84,30 @@ final class OutboxStore: ObservableObject {
         case .craftPage:
             guard config.isConfigured, let pageId = item.pageId else { throw CraftError.notConfigured }
             try await CraftClient(url: config.craftLink).appendBlocks(pageId: pageId, markdown: item.text)
+        case .newPage:
+            guard config.isConfigured, let title = item.title else { throw CraftError.notConfigured }
+            let client = CraftClient(url: config.craftLink)
+            // Create the page once; if a later step fails, the id is saved so
+            // the retry appends to the same page instead of making another.
+            var pageId = item.createdPageId
+            if pageId == nil {
+                pageId = try await client.createDocument(title: title, folderId: item.folderId)
+                record(createdPageId: pageId, for: item.id)
+            }
+            if let pageId, !item.text.isEmpty {
+                try await client.appendBlocks(pageId: pageId, markdown: item.text)
+            }
+        case .task:
+            guard config.isConfigured else { throw CraftError.notConfigured }
+            try await CraftClient(url: config.craftLink)
+                .addTask(markdown: item.text, schedule: item.dueDay, deadline: nil, destinationBlockId: item.inboxId)
+        case .baserow:
+            guard !config.baserowToken.isEmpty else { throw BaserowError.notConfigured }
+            guard let tableId = item.tableId, let json = item.fieldsJSON,
+                  let fields = try? JSONSerialization.jsonObject(with: json) as? [String: Any] else {
+                throw BaserowError.badResponse
+            }
+            _ = try await BaserowClient(token: config.baserowToken).createRow(tableId: tableId, fields: fields)
         }
     }
 }

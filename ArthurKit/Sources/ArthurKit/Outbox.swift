@@ -8,6 +8,9 @@ public struct OutboxItem: Codable, Identifiable, Equatable {
         case bit        // new row in the Bits table
         case reflection // append to a day's Craft daily note
         case craftPage  // append to a specific Craft page
+        case newPage    // create a Craft page in a folder (title + body)
+        case task       // add a Craft task
+        case baserow    // new row in a Baserow table
     }
 
     public let id: UUID
@@ -20,18 +23,40 @@ public struct OutboxItem: Codable, Identifiable, Equatable {
     /// `.reflection`: the day it was written for (`yyyy-MM-dd`), so a note
     /// typed Monday night lands on Monday even if it sends on Tuesday.
     public let day: String?
+    /// `.newPage`: the title, destination folder, and — once the page has
+    /// been created but its body not yet appended — the new page's id, so a
+    /// resumed send never creates the page twice.
+    public let title: String?
+    public let folderId: String?
+    public var createdPageId: String?
+    /// `.task`: due day (`yyyy-MM-dd`) and the inbox document id, if any.
+    public let dueDay: String?
+    public let inboxId: String?
+    /// `.baserow`: target table and the JSON-encoded field payload.
+    public let tableId: Int?
+    public let fieldsJSON: Data?
     public let createdAt: Date
     /// Set when a send failed for a reason other than being offline. Items
     /// with a failure are never retried automatically; the user decides.
     public var failure: String?
 
-    public init(kind: Kind, text: String, pageId: String? = nil, pageTitle: String? = nil, day: String? = nil) {
+    public init(kind: Kind, text: String, pageId: String? = nil, pageTitle: String? = nil, day: String? = nil,
+                title: String? = nil, folderId: String? = nil, createdPageId: String? = nil,
+                dueDay: String? = nil, inboxId: String? = nil,
+                tableId: Int? = nil, fieldsJSON: Data? = nil) {
         self.id = UUID()
         self.kind = kind
         self.text = text
         self.pageId = pageId
         self.pageTitle = pageTitle
         self.day = day
+        self.title = title
+        self.folderId = folderId
+        self.createdPageId = createdPageId
+        self.dueDay = dueDay
+        self.inboxId = inboxId
+        self.tableId = tableId
+        self.fieldsJSON = fieldsJSON
         self.createdAt = Date()
         self.failure = nil
     }
@@ -41,6 +66,9 @@ public struct OutboxItem: Codable, Identifiable, Equatable {
         case .bit: return "Bit"
         case .reflection: return "Reflection"
         case .craftPage: return pageTitle ?? "Craft page"
+        case .newPage: return "New page" + (title.map { ": " + $0 } ?? "")
+        case .task: return "Task"
+        case .baserow: return "Baserow row"
         }
     }
 
