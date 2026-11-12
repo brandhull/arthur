@@ -5,6 +5,12 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-11-12
+
+### Changed
+- Save and Push are outlined in the icon's subtle blue (#36568A) with a fill
+  matching the current light or dark background, instead of a solid blue fill.
+
 ## [1.6.2] - 2026-11-12
 
 ### Changed

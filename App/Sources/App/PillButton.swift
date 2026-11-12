@@ -29,9 +29,13 @@ struct PillButton: View {
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Theme.buttonBlue)
+                    .fill(Theme.background(scheme))
             )
-            .foregroundStyle(Color.white)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Theme.buttonBlue, lineWidth: 1.5)
+            )
+            .foregroundStyle(Theme.primary(scheme))
         }
         .buttonStyle(.plain)
     }
