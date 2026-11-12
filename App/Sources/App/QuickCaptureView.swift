@@ -220,7 +220,7 @@ struct QuickCaptureView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         if canSave {
-                            PillButton(systemImage: "arrow.up.circle", label: isCraftSubmitting ? "Saving…" : "Save", blue: true, action: save)
+                            PillButton(systemImage: "arrow.up.circle", label: isCraftSubmitting ? "Saving…" : "Save", action: save)
                                 .disabled(isCraftSubmitting)
                         }
                     }
@@ -875,7 +875,7 @@ struct QuickCaptureView: View {
             if tableId != nil && !fields.isEmpty {
                 HStack {
                     Spacer()
-                    PillButton(systemImage: "arrow.up.circle", label: isBaserowSubmitting ? "Pushing…" : "Push", blue: true) {
+                    PillButton(systemImage: "arrow.up.circle", label: isBaserowSubmitting ? "Pushing…" : "Push") {
                         Task { await submitBaserow() }
                     }
                     .disabled(isBaserowSubmitting)

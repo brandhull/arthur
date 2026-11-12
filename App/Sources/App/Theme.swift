@@ -26,6 +26,8 @@ enum Theme {
     static let darkText = Color(red: 211.0 / 255.0, green: 211.0 / 255.0, blue: 211.0 / 255.0)
 
     static let accentBright = Color(red: 0.357, green: 0.608, blue: 1.0)   // #5B9BFF, still used for the checkbox fill
+    /// The most subtle of the three blues in the app icon (#36568A) — fill for buttons.
+    static let buttonBlue = Color(red: 0x36 / 255, green: 0x56 / 255, blue: 0x8A / 255)
     static let accentDim    = Color(red: 0.18, green: 0.30, blue: 0.47)
 
     static func background(_ scheme: ColorScheme) -> Color {

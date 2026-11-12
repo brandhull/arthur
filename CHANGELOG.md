@@ -5,6 +5,12 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-11-12
+
+### Changed
+- Save and Push buttons use the most subtle of the app icon's three blues
+  (#36568A) with white text.
+
 ## [1.6.1] - 2026-11-12
 
 ### Changed
