@@ -5,6 +5,7 @@ import SwiftUI
 struct PillButton: View {
     let systemImage: String
     let label: String
+    var blue: Bool = false
     let action: () -> Void
 
     @Environment(\.colorScheme) private var scheme
@@ -29,9 +30,9 @@ struct PillButton: View {
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Theme.primary(scheme))
+                    .fill(blue ? Theme.accentBright : Theme.primary(scheme))
             )
-            .foregroundStyle(scheme == .dark ? Color.black : Color.white)
+            .foregroundStyle(blue ? Theme.baseColor : (scheme == .dark ? Color.black : Color.white))
         }
         .buttonStyle(.plain)
     }

@@ -5,6 +5,12 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-11-12
+
+### Changed
+- Save (Bits, Reflection, Craft pages, tasks) is now right-aligned, matching
+  Push for Baserow, and both use Arthur's blue.
+
 ## [1.6.0] - 2026-11-11
 
 ### Added
