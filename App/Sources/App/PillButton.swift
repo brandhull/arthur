@@ -3,7 +3,6 @@ import SwiftUI
 /// Rounded-corner box button used for "Add Task" and "Add to Note" — replaces
 /// the earlier free-floating "+" icon per Brandon's request.
 struct PillButton: View {
-    let systemImage: String
     let label: String
     let action: () -> Void
 
@@ -11,10 +10,7 @@ struct PillButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: systemImage)
-                Text(label)
-            }
+            Text(label)
             // Mac keeps the scalable .subheadline token; iOS/iPadOS now
             // match Theme.inputFontSize (= the header date's own size), per
             // Brandon's ask to collapse every scattered iOS text size to

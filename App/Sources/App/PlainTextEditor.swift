@@ -164,15 +164,28 @@ private struct UITextViewBridge: UIViewRepresentable {
         // Putting the keyboard away: dragging the text down dismisses it, and
         // a button above the keyboard does the same on demand.
         view.keyboardDismissMode = .interactive
-        let toolbar = UIToolbar(frame: CGRect(x: 0, y: 0, width: 0, height: 44))
-        toolbar.items = [
-            UIBarButtonItem(systemItem: .flexibleSpace),
-            UIBarButtonItem(
-                image: UIImage(systemName: "keyboard.chevron.compact.down"),
-                primaryAction: UIAction { [weak view] _ in view?.resignFirstResponder() }
-            )
-        ]
-        view.inputAccessoryView = toolbar
+        // A rounded button in the same shape as the Destination card, sitting
+        // on a keyboard-styled strip with breathing room around it.
+        let bar = UIInputView(frame: CGRect(x: 0, y: 0, width: 0, height: 56), inputViewStyle: .keyboard)
+        bar.allowsSelfSizing = true
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "keyboard.chevron.compact.down"), for: .normal)
+        button.tintColor = UIColor { t in UIColor(Theme.primary(t.userInterfaceStyle == .dark ? .dark : .light)) }
+        button.backgroundColor = UIColor { t in UIColor(Theme.sidebarCardBackground(t.userInterfaceStyle == .dark ? .dark : .light)) }
+        button.layer.cornerRadius = Theme.sidebarCardCornerRadius
+        button.layer.cornerCurve = .continuous
+        button.layer.borderWidth = Theme.borderWidth
+        button.layer.borderColor = UIColor.separator.cgColor
+        button.addAction(UIAction { [weak view] _ in view?.resignFirstResponder() }, for: .touchUpInside)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        bar.addSubview(button)
+        NSLayoutConstraint.activate([
+            button.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -12),
+            button.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+            button.widthAnchor.constraint(equalToConstant: 64),
+            button.heightAnchor.constraint(equalToConstant: 36)
+        ])
+        view.inputAccessoryView = bar
         return view
     }
 

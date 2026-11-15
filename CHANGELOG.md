@@ -5,6 +5,13 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.6.4] - 2026-11-15
+
+### Changed
+- Save and Push show just the word, no icon.
+- iPhone: the keyboard-down button is a rounded rectangle matching the
+  Destination card, on a keyboard-styled strip with room around it.
+
 ## [1.6.3] - 2026-11-12
 
 ### Changed
