@@ -117,7 +117,7 @@ struct iOSAgendaLayout<Content: View>: View {
                 Image(systemName: isPreviewing ? "eye.fill" : "eye")
                     .font(.system(size: 18))
                     .foregroundStyle(isPreviewing ? Theme.accentBright : Theme.primary(effectiveScheme))
-                    .frame(width: 44, height: 44)
+                    .frame(width: 34, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -141,6 +141,9 @@ struct iOSAgendaLayout<Content: View>: View {
 
             Text(todayFormatted)
                 .font(.system(size: Theme.sectionHeadingSize, weight: Theme.headingWeight))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .layoutPriority(1)
 
             Spacer()
 
@@ -168,6 +171,9 @@ struct iOSAgendaLayout<Content: View>: View {
 
             Text(todayFormatted)
                 .font(.system(size: Theme.sectionHeadingSize, weight: Theme.headingWeight))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .layoutPriority(1)
 
             Spacer()
 

@@ -22,7 +22,7 @@ struct AppearanceCycleButton: View {
             Image(systemName: "sun.max")
                 .font(.system(size: 18))
                 .foregroundStyle(Theme.primary(effectiveScheme))
-                .frame(width: 44, height: 44)
+                .frame(width: 34, height: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

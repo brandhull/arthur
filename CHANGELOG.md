@@ -5,6 +5,13 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.6.5] - 2026-11-18
+
+### Fixed
+- iPhone: the date in the top bar no longer wraps. The eye and light/dark
+  buttons are slightly narrower, and the date keeps one line (shrinking a
+  little only if it must).
+
 ## [1.6.4] - 2026-11-15
 
 ### Changed
