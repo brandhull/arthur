@@ -7,6 +7,10 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [1.6.5] - 2026-11-18
 
+### Changed
+- Destination card: while expanded, the header shows only the chosen page,
+  folder or table; the destination type is already in the picker below.
+
 ### Fixed
 - iPhone: the date in the top bar no longer wraps. The eye and light/dark
   buttons are slightly narrower, and the date keeps one line (shrinking a

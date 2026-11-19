@@ -283,11 +283,15 @@ struct QuickCaptureView: View {
                     .layoutPriority(2)
                 Spacer(minLength: 8)
                 HStack(spacing: 0) {
-                    Text(name(target))
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
+                    // Expanded: the type is already in the picker just below,
+                    // so show only the chosen page / folder / table here.
+                    if !isDestinationExpanded {
+                        Text(name(target))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
                     if let detail = summaryDetail {
-                        Text(" · " + detail)
+                        Text(isDestinationExpanded ? detail : " · " + detail)
                             .lineLimit(1)
                             .truncationMode(.tail)
                     }
