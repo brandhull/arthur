@@ -8,6 +8,9 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 ## [1.6.5] - 2026-11-18
 
 ### Changed
+- Quick Capture: Save moved out of the writing panel into the Destination
+  card, bottom right under the fields. It's always there, dimmed until there
+  is something to save.
 - Destination card: while expanded, the header shows only the chosen page,
   folder or table; the destination type is already in the picker below.
 

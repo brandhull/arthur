@@ -205,29 +205,6 @@ struct QuickCaptureView: View {
                 captureBox
                     .padding(.bottom, 16)
                     .frame(maxHeight: .infinity)
-
-                if canSave || craftErrorMessage != nil || statusMessage != nil {
-                    VStack(alignment: .trailing, spacing: 8) {
-                        if let craftErrorMessage {
-                            Text(craftErrorMessage)
-                                .foregroundStyle(.red)
-                                .font(.caption)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        } else if let statusMessage {
-                            Text(statusMessage)
-                                .foregroundStyle(Theme.secondaryText(effectiveScheme))
-                                .font(.caption)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        if canSave {
-                            PillButton(label: isCraftSubmitting ? "Saving…" : "Save", action: save)
-                                .disabled(isCraftSubmitting)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
-                }
             }
 
             destinationCard
@@ -242,6 +219,36 @@ struct QuickCaptureView: View {
         }
     }
 
+    /// Save (and its error / status line) lives in the Destination card, under
+    /// the fields, so the writing panel is just the writing. Shown even while
+    /// the card is collapsed, so saving never needs it expanded. Always present
+    /// (dimmed until there's something to save) so it never pops in and out.
+    @ViewBuilder
+    private var saveRow: some View {
+        if target != .baserow {
+            VStack(alignment: .trailing, spacing: 8) {
+                if let craftErrorMessage {
+                    Text(craftErrorMessage)
+                        .foregroundStyle(.red)
+                        .font(.caption)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else if let statusMessage {
+                    Text(statusMessage)
+                        .foregroundStyle(Theme.secondaryText(effectiveScheme))
+                        .font(.caption)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                PillButton(label: isCraftSubmitting ? "Saving…" : "Save", action: save)
+                    .disabled(isCraftSubmitting || !canSave)
+                    .opacity(canSave ? 1 : 0.4)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 14)
+        }
+    }
+
     private var destinationCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             destinationHeader
@@ -249,9 +256,10 @@ struct QuickCaptureView: View {
                 ScrollView {
                     destinationFields
                         .padding(.top, 8)
-                        .padding(.bottom, 16)
+                        .padding(.bottom, 8)
                 }
             }
+            saveRow
         }
         .background(
             RoundedRectangle(cornerRadius: Theme.sidebarCardCornerRadius, style: .continuous)
