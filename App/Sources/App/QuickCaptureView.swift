@@ -47,6 +47,8 @@ struct QuickCaptureView: View {
     // MARK: Sub-page picker (see loadSubPages)
     @State private var subPages: [CraftClient.CraftBlock] = []
     @State private var subPagesParentId: String?
+    // The page a chosen sub-page lives in, so the card can show both.
+    @State private var selectedParent: CraftDocument?
     @State private var isLoadingSubPages = false
 
     // MARK: Baserow state
@@ -170,7 +172,10 @@ struct QuickCaptureView: View {
     /// / table after it (this is the part that gives way when space is tight).
     private var summaryDetail: String? {
         switch target {
-        case .page: return selectedDoc?.title
+        case .page:
+            guard let selectedDoc else { return nil }
+            if let selectedParent { return selectedParent.title + " › " + selectedDoc.title }
+            return selectedDoc.title
         case .newPage: return selectedFolder?.name
         case .baserow: return tables.first(where: { $0.id == tableId })?.name
         default: return nil
@@ -398,10 +403,22 @@ struct QuickCaptureView: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let selectedDoc {
                     HStack {
-                        Text(selectedDoc.title).font(.system(size: inputFontSize)).lineLimit(1).truncationMode(.middle)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(selectedDoc.title).font(.system(size: inputFontSize)).lineLimit(1).truncationMode(.middle)
+                            // Which page / folder it lives in, so a sub-page
+                            // never stands alone.
+                            if let where_ = selectedParent?.title ?? selectedDoc.folder {
+                                Text(where_)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                    .font(.system(size: inputFontSize))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                         Spacer()
                         Button("Change") {
                             self.selectedDoc = nil
+                            selectedParent = nil
                             subPages = []
                         }
                         .font(.system(.footnote))
@@ -420,6 +437,7 @@ struct QuickCaptureView: View {
                         VStack(alignment: .leading, spacing: 0) {
                             ForEach(subPages, id: \.id) { sub in
                                 Button {
+                                    selectedParent = selectedDoc
                                     self.selectedDoc = CraftDocument(id: sub.id, title: sub.markdown)
                                     subPages = []
                                 } label: {
@@ -451,6 +469,7 @@ struct QuickCaptureView: View {
                             ForEach(results) { doc in
                                 Button {
                                     selectedDoc = doc
+                                    selectedParent = nil
                                     Task { await loadSubPages(of: doc) }
                                 } label: {
                                     VStack(alignment: .leading, spacing: 2) {
@@ -783,7 +802,7 @@ struct QuickCaptureView: View {
                 // The page stays selected so repeat captures to it are just
                 // type + Save; the collapsed bar always shows where it goes.
                 draft.text = ""
-                flash("Added to \(selectedDoc.title)")
+                flash("Added to \(selectedParent.map { $0.title + " › " } ?? "")\(selectedDoc.title)")
             } catch {
                 if isClearlyOffline(error) {
                     // No connection: keep it on disk and clear the screen as

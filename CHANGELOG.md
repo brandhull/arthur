@@ -5,6 +5,13 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.6.7] - 2026-11-24
+
+### Changed
+- Append Page: a chosen sub-page now shows the page it lives in (a second
+  line under its title; a top-level page shows its folder). The collapsed
+  Destination bar reads "Parent › Sub-page" and the confirmation names both.
+
 ## [1.6.6] - 2026-11-23
 
 ### Changed
