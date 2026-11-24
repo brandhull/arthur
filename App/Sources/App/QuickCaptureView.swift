@@ -542,7 +542,7 @@ struct QuickCaptureView: View {
     @ViewBuilder
     private var taskFields: some View {
         // Same shape as Append Page: pick where it goes first (the picker's own
-        // placeholder says what it is), then the due date.
+        // placeholder says what it is), then the due date (its own text says what it is, so no label).
         FieldBox(scheme: effectiveScheme) {
             MenuFieldPicker(
                 placeholder: "Default (\(store.config.defaultInbox?.name ?? "Craft Inbox"))",
@@ -551,8 +551,20 @@ struct QuickCaptureView: View {
                 selection: $taskInboxId, fontSize: inputFontSize, scheme: effectiveScheme
             )
         }
-        FieldLabel(title: "Due date")
         FieldBox(scheme: effectiveScheme) {
+            #if os(macOS)
+            // Mac: the date sits beside the checkbox, one row.
+            HStack {
+                Toggle("Set a due date", isOn: $includeDueDate)
+                    .font(.system(size: inputFontSize))
+                Spacer()
+                if includeDueDate {
+                    DatePicker("Date", selection: $dueDate, displayedComponents: .date)
+                        .labelsHidden()
+                }
+            }
+            .padding(12)
+            #else
             VStack(alignment: .leading, spacing: 0) {
                 Toggle("Set a due date", isOn: $includeDueDate)
                     .font(.system(size: inputFontSize))
@@ -563,6 +575,7 @@ struct QuickCaptureView: View {
                         .padding(12)
                 }
             }
+            #endif
         }
     }
 

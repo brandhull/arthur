@@ -9,8 +9,9 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ### Changed
 - New Task layout in the Destination card: Inbox picker first (no label),
-  then Due date (no "optional"), then Save. The card is taller for tasks so
-  the Inbox picker is no longer cut off.
+  then the "Set a due date" box (no label), then Save. The card is taller for
+  tasks so the Inbox picker is no longer cut off. On Mac the date picker sits
+  beside the checkbox.
 
 ## [1.6.5] - 2026-11-18
 
