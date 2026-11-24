@@ -271,7 +271,7 @@ struct QuickCaptureView: View {
         )
         .padding(.horizontal, destinationCardHorizontalInset)
         .padding(.bottom, Theme.sidebarCardInset)
-        .frame(maxHeight: isDestinationExpanded ? 340 : nil)
+        .frame(maxHeight: isDestinationExpanded ? (target == .task ? 420 : 340) : nil)
     }
 
     /// "Destination" + where it's currently pointed + a chevron. The whole
@@ -541,7 +541,17 @@ struct QuickCaptureView: View {
 
     @ViewBuilder
     private var taskFields: some View {
-        FieldLabel(title: "Due date (optional)")
+        // Same shape as Append Page: pick where it goes first (the picker's own
+        // placeholder says what it is), then the due date.
+        FieldBox(scheme: effectiveScheme) {
+            MenuFieldPicker(
+                placeholder: "Default (\(store.config.defaultInbox?.name ?? "Craft Inbox"))",
+                options: store.config.inboxes.map { (label: $0.name, value: Optional($0.id)) },
+                noneValue: Optional<String>.none,
+                selection: $taskInboxId, fontSize: inputFontSize, scheme: effectiveScheme
+            )
+        }
+        FieldLabel(title: "Due date")
         FieldBox(scheme: effectiveScheme) {
             VStack(alignment: .leading, spacing: 0) {
                 Toggle("Set a due date", isOn: $includeDueDate)
@@ -553,15 +563,6 @@ struct QuickCaptureView: View {
                         .padding(12)
                 }
             }
-        }
-        FieldLabel(title: "Inbox (optional)")
-        FieldBox(scheme: effectiveScheme) {
-            MenuFieldPicker(
-                placeholder: "Default (\(store.config.defaultInbox?.name ?? "Craft Inbox"))",
-                options: store.config.inboxes.map { (label: $0.name, value: Optional($0.id)) },
-                noneValue: Optional<String>.none,
-                selection: $taskInboxId, fontSize: inputFontSize, scheme: effectiveScheme
-            )
         }
     }
 

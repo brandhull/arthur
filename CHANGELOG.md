@@ -5,6 +5,13 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.6.6] - 2026-11-23
+
+### Changed
+- New Task layout in the Destination card: Inbox picker first (no label),
+  then Due date (no "optional"), then Save. The card is taller for tasks so
+  the Inbox picker is no longer cut off.
+
 ## [1.6.5] - 2026-11-18
 
 ### Changed
