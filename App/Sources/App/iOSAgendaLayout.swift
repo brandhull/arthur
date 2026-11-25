@@ -36,6 +36,39 @@ struct iOSAgendaLayout<Content: View>: View {
     // Transient, not persisted — a drawer starts closed every time, same as
     // any standard hamburger menu.
     @State private var showingDrawer = false
+    // Horizontal finger travel while dragging the drawer open (positive) or
+    // closed (negative); nil when no drag is in progress.
+    @State private var drawerDragX: CGFloat?
+    private let edgeGrabWidth: CGFloat = 20
+
+    private func drawerProgress(width: CGFloat) -> CGFloat {
+        guard let x = drawerDragX else { return showingDrawer ? 1 : 0 }
+        let p = showingDrawer ? 1 + x / width : x / width
+        return max(0, min(1, p))
+    }
+
+    /// Drag from the left edge to open, drag the open panel to close.
+    private func drawerGesture(width: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 8)
+            .onChanged { v in
+                // Only horizontal intent counts, so vertical scrolling is left alone.
+                guard drawerDragX != nil || abs(v.translation.width) > abs(v.translation.height) else { return }
+                drawerDragX = showingDrawer ? min(0, v.translation.width) : max(0, v.translation.width)
+            }
+            .onEnded { v in
+                guard drawerDragX != nil else { return }
+                let open: Bool
+                if showingDrawer {
+                    open = !(v.translation.width < -width * 0.3 || v.predictedEndTranslation.width < -width * 0.5)
+                } else {
+                    open = v.translation.width > width * 0.35 || v.predictedEndTranslation.width > width * 0.5
+                }
+                withAnimation(.easeOut(duration: 0.2)) {
+                    showingDrawer = open
+                    drawerDragX = nil
+                }
+            }
+    }
 
     init(
         store: TaskStore, selectedTab: Binding<HomeTab>,
@@ -91,13 +124,25 @@ struct iOSAgendaLayout<Content: View>: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    if showingDrawer {
+                    let drawerWidth = geo.size.width * 0.75
+                    let progress = drawerProgress(width: drawerWidth)
+
+                    // A thin strip along the left edge: grab it and drag right.
+                    // Always in the tree (the drawer is drawn above it), so the
+                    // gesture isn't cancelled when the drawer appears mid-drag.
+                    Color.clear
+                        .frame(width: edgeGrabWidth)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .gesture(drawerGesture(width: drawerWidth))
+
+                    if progress > 0 {
                         iOSSidebarDrawer(
                             selectedTab: $selectedTab,
                             showingSettings: $showingSettings, isPresented: $showingDrawer,
-                            width: geo.size.width * 0.75, effectiveScheme: effectiveScheme
+                            width: drawerWidth, progress: progress, effectiveScheme: effectiveScheme
                         )
-                        .transition(.move(edge: .leading))
+                        .simultaneousGesture(drawerGesture(width: drawerWidth))
                     }
                 }
                 .animation(.easeInOut(duration: 0.2), value: showingDrawer)

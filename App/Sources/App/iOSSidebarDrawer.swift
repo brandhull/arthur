@@ -16,11 +16,13 @@ struct iOSSidebarDrawer: View {
     @Binding var showingSettings: Bool
     @Binding var isPresented: Bool
     let width: CGFloat
+    /// 0 = fully closed, 1 = fully open; follows the finger while dragging.
+    let progress: CGFloat
     let effectiveScheme: ColorScheme
 
     var body: some View {
         ZStack(alignment: .leading) {
-            Color.black.opacity(0.3)
+            Color.black.opacity(0.3 * progress)
                 .ignoresSafeArea()
                 .onTapGesture { isPresented = false }
 
@@ -48,6 +50,7 @@ struct iOSSidebarDrawer: View {
                 Theme.background(effectiveScheme)
                     .ignoresSafeArea(edges: .vertical)
             )
+            .offset(x: -(1 - progress) * width)
         }
         // Tapping any destination or opening Settings closes the drawer —
         // standard drawer UX. Handled here (not inside SidebarNavList

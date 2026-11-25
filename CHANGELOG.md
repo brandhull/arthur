@@ -5,6 +5,13 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-11-24
+
+### Added
+- iPhone and iPad portrait: swipe right from the left edge of the screen to
+  open the navigation panel; the panel follows your finger, and dragging it
+  left closes it. The hamburger button and tapping outside still work.
+
 ## [1.7.0] - 2026-11-24
 
 ### Added
