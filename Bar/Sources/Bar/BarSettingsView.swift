@@ -148,9 +148,15 @@ struct ClipPageSection: View {
 
             if isChoosing {
                 VStack(alignment: .leading, spacing: 0) {
-                    TextField("Search documents…", text: $query)
-                        .textFieldStyle(.plain)
-                        .padding(10)
+                    HStack {
+                        TextField("Search documents…", text: $query)
+                            .textFieldStyle(.plain)
+                        Button(documentStore.isRefreshing ? "Refreshing…" : "Refresh") {
+                            documentStore.refresh(craftLink: Config.load().craftLink)
+                        }
+                        .disabled(documentStore.isRefreshing)
+                    }
+                    .padding(10)
                     if !results.isEmpty {
                         Divider()
                         ForEach(results) { doc in

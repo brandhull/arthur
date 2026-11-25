@@ -14,7 +14,8 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
   through the Accessibility API, falling back to a synthetic ⌘C that restores
   the clipboard. If nothing is selected it uses the clipboard; if the save
   fails the text is copied to the clipboard. A Recent Clips submenu lists the
-  last 8. Mac only.
+  last 8. The clip page picker has a Refresh button to pull newly created
+  pages from Craft. Mac only.
 
 ### Changed
 - ArthurBar's Hotkeys window is now Settings (clip page, Accessibility status,
