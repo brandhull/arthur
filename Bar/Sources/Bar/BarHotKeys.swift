@@ -10,6 +10,23 @@ import Carbon.HIToolbox
 struct BarHotKeys: Codable {
     var addTask: HotKeySpec
     var quickCapture: HotKeySpec
+    var clip: HotKeySpec
+
+    private enum CodingKeys: String, CodingKey { case addTask, quickCapture, clip }
+
+    init(addTask: HotKeySpec, quickCapture: HotKeySpec, clip: HotKeySpec) {
+        self.addTask = addTask
+        self.quickCapture = quickCapture
+        self.clip = clip
+    }
+
+    // `clip` was added later; older saved hotkeys must keep their rebinds.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        addTask = try c.decode(HotKeySpec.self, forKey: .addTask)
+        quickCapture = try c.decode(HotKeySpec.self, forKey: .quickCapture)
+        clip = try c.decodeIfPresent(HotKeySpec.self, forKey: .clip) ?? Self.defaultClip
+    }
 
     static let defaultAddTask = HotKeySpec(
         keyCode: 0, modifiers: UInt32(cmdKey | optionKey), display: "⌥⌘A", keyChar: "a"
@@ -17,7 +34,10 @@ struct BarHotKeys: Codable {
     static let defaultQuickCapture = HotKeySpec(
         keyCode: 8, modifiers: UInt32(cmdKey | optionKey), display: "⌥⌘C", keyChar: "c"
     )
-    static let `default` = BarHotKeys(addTask: defaultAddTask, quickCapture: defaultQuickCapture)
+    static let defaultClip = HotKeySpec(
+        keyCode: 1, modifiers: UInt32(cmdKey | optionKey), display: "⌥⌘S", keyChar: "s"
+    )
+    static let `default` = BarHotKeys(addTask: defaultAddTask, quickCapture: defaultQuickCapture, clip: defaultClip)
 
     private static let defaultsKey = "arthurbar.hotkeys"
 

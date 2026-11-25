@@ -6,6 +6,7 @@ import Carbon.HIToolbox
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
+    private var clipHotKey: HotKey?
     private var addTaskHotKey: HotKey?
     private var addTaskPanel: NSPanel?
     private var quickCaptureHotKey: HotKey?
@@ -42,6 +43,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // with a mode switch — Brandon uses both regularly, each focused on
         // one job.
         let saved = BarHotKeys.load()
+        if !applyClipHotKey(saved.clip, persist: false) {
+            NSLog("ArthurBar: failed to register \(saved.clip.display) for Clip Selection (another app may own it)")
+        }
         if !applyAddTaskHotKey(saved.addTask, persist: false) {
             NSLog("ArthurBar: failed to register \(saved.addTask.display) for Quick Task (another app may own it)")
         }
@@ -73,6 +77,71 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusItem.menu = buildMenu()
         return true
+    }
+
+    @discardableResult
+    private func applyClipHotKey(_ spec: HotKeySpec, persist: Bool = true) -> Bool {
+        let old = clipHotKey
+        clipHotKey = nil
+        guard let new = HotKey(keyCode: spec.keyCode, modifiers: spec.modifiers,
+                               callback: { [weak self] in self?.clipSelection() })
+        else {
+            clipHotKey = old
+            return false
+        }
+        clipHotKey = new
+        if persist {
+            var keys = BarHotKeys.load()
+            keys.clip = spec
+            keys.save()
+        }
+        statusItem.menu = buildMenu()
+        return true
+    }
+
+    /// Grabs the selected text from the front app and appends it, as plain
+    /// text, to the clip page. No window: the toast is the only feedback.
+    /// Nothing selected falls back to the clipboard. If the save fails, the
+    /// text goes onto the clipboard so it isn't lost.
+    private func clipSelection() {
+        guard let page = ClipStore.page else {
+            Toast.shared.show("Choose a clip page in ArthurBar settings", isError: true)
+            openSettings()
+            return
+        }
+        let config = Config.load()
+        guard config.isConfigured else {
+            Toast.shared.show("Set up Craft in Arthur first", isError: true)
+            return
+        }
+        Task { @MainActor in
+            let grabbed = await SelectionGrabber.grab()
+            if grabbed.needsPermission {
+                Toast.shared.show("Allow ArthurBar in Accessibility to clip selected text", isError: true)
+                return
+            }
+            var text = grabbed.text ?? ""
+            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                text = NSPasteboard.general.string(forType: .string) ?? ""
+            }
+            let clip = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !clip.isEmpty else {
+                Toast.shared.show("Nothing selected or copied", isError: true)
+                return
+            }
+            do {
+                try await CraftClient(url: config.craftLink).appendBlocks(pageId: page.id, markdown: clip)
+                ClipStore.record(text: clip, pageTitle: page.title)
+                statusItem.menu = buildMenu()
+                Toast.shared.show("Added to \(page.title)")
+            } catch {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(clip, forType: .string)
+                Toast.shared.show(isClearlyOffline(error)
+                                  ? "Offline. Copied to the clipboard instead"
+                                  : "Couldn't save. Copied to the clipboard instead", isError: true)
+            }
+        }
     }
 
     @discardableResult
@@ -228,6 +297,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         let keys = BarHotKeys.load()
 
+        let clip = NSMenuItem(title: "Clip Selection", action: #selector(clipFromMenu), keyEquivalent: keys.clip.keyChar)
+        clip.keyEquivalentModifierMask = keys.clip.cocoaModifiers
+        clip.target = self
+        menu.addItem(clip)
+
+        let recents = ClipStore.recents
+        if !recents.isEmpty {
+            let recentItem = NSMenuItem(title: "Recent Clips", action: nil, keyEquivalent: "")
+            let sub = NSMenu()
+            for r in recents {
+                let flat = r.text.replacingOccurrences(of: "\n", with: " ")
+                let preview = flat.count > 40 ? String(flat.prefix(40)) + "…" : flat
+                let item = NSMenuItem(title: "\(preview)  →  \(r.pageTitle)", action: #selector(copyRecentClip(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = r.text
+                sub.addItem(item)
+            }
+            recentItem.submenu = sub
+            menu.addItem(recentItem)
+        }
+        menu.addItem(.separator())
+
         let add = NSMenuItem(title: "Quick Task…", action: #selector(openAddTaskPanel), keyEquivalent: keys.addTask.keyChar)
         add.keyEquivalentModifierMask = keys.addTask.cocoaModifiers
         add.target = self
@@ -239,7 +330,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(capture)
 
         menu.addItem(.separator())
-        let hotkeys = NSMenuItem(title: "Hotkeys…", action: #selector(openSettings), keyEquivalent: "")
+        let hotkeys = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: "")
         hotkeys.target = self
         menu.addItem(hotkeys)
         menu.addItem(.separator())
@@ -250,6 +341,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return menu
     }
 
+    @objc private func clipFromMenu() {
+        // Let the menu close and the previous app regain focus first.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in self?.clipSelection() }
+    }
+
+    @objc private func copyRecentClip(_ sender: NSMenuItem) {
+        guard let text = sender.representedObject as? String else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        Toast.shared.show("Copied to the clipboard")
+    }
+
     @objc private func openAddTaskPanel() { showAddTaskPanel() }
     @objc private func openQuickCapturePanel() { showQuickCapturePanel() }
 
@@ -258,13 +361,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let view = BarSettingsView(hotKeys: BarHotKeys.load()) { [weak self] row, spec in
                 guard let self else { return false }
                 switch row {
+                case .clip: return self.applyClipHotKey(spec)
                 case .addTask: return self.applyAddTaskHotKey(spec)
                 case .quickCapture: return self.applyQuickCaptureHotKey(spec)
                 }
             }
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
             window.styleMask = [.titled, .closable]
-            window.title = "ArthurBar Hotkeys"
+            window.title = "ArthurBar Settings"
             window.isReleasedWhenClosed = false
             window.center()
             settingsWindow = window

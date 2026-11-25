@@ -5,6 +5,21 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-24
+
+### Added
+- ArthurBar: Clip Selection. Select text in any app, press a hotkey (⌥⌘S by
+  default, rebindable) and it is appended as plain text to a chosen clip page
+  in Craft, with a small quiet toast as confirmation. Grabs the selection
+  through the Accessibility API, falling back to a synthetic ⌘C that restores
+  the clipboard. If nothing is selected it uses the clipboard; if the save
+  fails the text is copied to the clipboard. A Recent Clips submenu lists the
+  last 8. Mac only.
+
+### Changed
+- ArthurBar's Hotkeys window is now Settings (clip page, Accessibility status,
+  hotkeys) and follows Arthur's light/dark choice instead of always dark.
+
 ## [1.6.7] - 2026-11-24
 
 ### Changed
