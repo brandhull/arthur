@@ -7,6 +7,8 @@ import Carbon.HIToolbox
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var clipHotKey: HotKey?
+    private var screenshotHotKey: HotKey?
+    private var isCapturingScreenshot = false
     private var addTaskHotKey: HotKey?
     private var addTaskPanel: NSPanel?
     private var quickCaptureHotKey: HotKey?
@@ -45,6 +47,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let saved = BarHotKeys.load()
         if !applyClipHotKey(saved.clip, persist: false) {
             NSLog("ArthurBar: failed to register \(saved.clip.display) for Clip Selection (another app may own it)")
+        }
+        if !applyScreenshotHotKey(saved.screenshot, persist: false) {
+            NSLog("ArthurBar: failed to register \(saved.screenshot.display) for Clip Screenshot (another app may own it)")
         }
         if !applyAddTaskHotKey(saved.addTask, persist: false) {
             NSLog("ArthurBar: failed to register \(saved.addTask.display) for Quick Task (another app may own it)")
@@ -99,22 +104,74 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
+    @discardableResult
+    private func applyScreenshotHotKey(_ spec: HotKeySpec, persist: Bool = true) -> Bool {
+        let old = screenshotHotKey
+        screenshotHotKey = nil
+        guard let new = HotKey(keyCode: spec.keyCode, modifiers: spec.modifiers,
+                               callback: { [weak self] in self?.clipScreenshot() })
+        else {
+            screenshotHotKey = old
+            return false
+        }
+        screenshotHotKey = new
+        if persist {
+            var keys = BarHotKeys.load()
+            keys.screenshot = spec
+            keys.save()
+        }
+        statusItem.menu = buildMenu()
+        return true
+    }
+
+    /// The clip page and Craft link, or nil after telling the user what's
+    /// missing.
+    private func clipDestination() -> (page: ClipPage, craftLink: String)? {
+        guard let page = ClipStore.page else {
+            Toast.shared.show("Choose a clip page in ArthurBar settings", isError: true)
+            openSettings()
+            return nil
+        }
+        let config = Config.load()
+        guard config.isConfigured else {
+            Toast.shared.show("Set up Craft in Arthur first", isError: true)
+            return nil
+        }
+        return (page, config.craftLink)
+    }
+
+    /// Drag over part of the screen and it's appended to the clip page.
+    /// Escape cancels quietly.
+    private func clipScreenshot() {
+        guard !isCapturingScreenshot, let target = clipDestination() else { return }
+        guard ScreenshotCapture.isAllowed || ScreenshotCapture.requestPermission() else {
+            Toast.shared.show("Allow ArthurBar in Screen Recording, then reopen it", isError: true)
+            return
+        }
+        isCapturingScreenshot = true
+        Task { @MainActor in
+            let image: Data?
+            do {
+                image = try await ScreenshotCapture.selectArea()
+            } catch {
+                isCapturingScreenshot = false
+                Toast.shared.show("Couldn't start the screenshot tool", isError: true)
+                return
+            }
+            // Free to take another while this one uploads.
+            isCapturingScreenshot = false
+            guard let image else { return }
+            await clipImage(image, to: target.page, craftLink: target.craftLink, onClipboard: false)
+        }
+    }
+
     /// Grabs the selected text from the front app and appends it, as plain
     /// text, to the clip page. No window: the toast is the only feedback.
     /// Nothing selected falls back to the clipboard, which may hold text or an
     /// image. If a text save fails, the text goes onto the clipboard so it
     /// isn't lost.
     private func clipSelection() {
-        guard let page = ClipStore.page else {
-            Toast.shared.show("Choose a clip page in ArthurBar settings", isError: true)
-            openSettings()
-            return
-        }
-        let config = Config.load()
-        guard config.isConfigured else {
-            Toast.shared.show("Set up Craft in Arthur first", isError: true)
-            return
-        }
+        guard let (page, craftLink) = clipDestination() else { return }
         Task { @MainActor in
             let grabbed = await SelectionGrabber.grab()
             if grabbed.needsPermission {
@@ -124,7 +181,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             var text = grabbed.text ?? ""
             if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 if let image = ClipboardImage.data(from: .general) {
-                    await clipImage(image, to: page, craftLink: config.craftLink)
+                    await clipImage(image, to: page, craftLink: craftLink, onClipboard: true)
                     return
                 }
                 text = NSPasteboard.general.string(forType: .string) ?? ""
@@ -135,7 +192,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             do {
-                try await CraftClient(url: config.craftLink).appendBlocks(pageId: page.id, markdown: clip)
+                try await CraftClient(url: craftLink).appendBlocks(pageId: page.id, markdown: clip)
                 ClipStore.record(text: clip, pageTitle: page.title)
                 statusItem.menu = buildMenu()
                 Toast.shared.show("Added to \(page.title)")
@@ -149,9 +206,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Shrinks a copied image and appends it to the clip page. The clipboard
-    /// is left alone, so a failed send loses nothing.
-    private func clipImage(_ original: Data, to page: ClipPage, craftLink: String) async {
+    /// Shrinks an image and appends it to the clip page. A copied image stays
+    /// on the clipboard; a fresh screenshot (`onClipboard: false`) is put
+    /// there only if sending fails, so it isn't lost.
+    private func clipImage(_ original: Data, to page: ClipPage, craftLink: String, onClipboard: Bool) async {
         Toast.shared.show("Sending image…")
         do {
             let jpeg = try await Task.detached { try ImagePrep.jpegForCraft(original) }.value
@@ -164,13 +222,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             switch failure {
             case .tooSmall: message = "Image is too small for Craft (under 100 px)"
             case .tooLarge: message = "Image is too large to send to Craft"
-            case .unreadable: message = "Couldn't read the copied image"
+            case .unreadable: message = "Couldn't read the image"
             }
             Toast.shared.show(message, isError: true)
         } catch {
-            Toast.shared.show(isClearlyOffline(error)
-                              ? "Offline. The image is still on the clipboard"
-                              : "Couldn't save. The image is still on the clipboard", isError: true)
+            if !onClipboard {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setData(original, forType: .png)
+            }
+            let kept = onClipboard ? "The image is still on the clipboard" : "Copied the image to the clipboard"
+            Toast.shared.show(isClearlyOffline(error) ? "Offline. \(kept)" : "Couldn't save. \(kept)",
+                              isError: true)
         }
     }
 
@@ -332,6 +394,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         clip.target = self
         menu.addItem(clip)
 
+        let shot = NSMenuItem(title: "Clip Screenshot", action: #selector(screenshotFromMenu), keyEquivalent: keys.screenshot.keyChar)
+        shot.keyEquivalentModifierMask = keys.screenshot.cocoaModifiers
+        shot.target = self
+        menu.addItem(shot)
+
         let recents = ClipStore.recents
         if !recents.isEmpty {
             let recentItem = NSMenuItem(title: "Recent Clips", action: nil, keyEquivalent: "")
@@ -382,6 +449,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in self?.clipSelection() }
     }
 
+    @objc private func screenshotFromMenu() {
+        // Let the menu close so it isn't in the picture.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in self?.clipScreenshot() }
+    }
+
     @objc private func copyRecentClip(_ sender: NSMenuItem) {
         guard let text = sender.representedObject as? String else { return }
         NSPasteboard.general.clearContents()
@@ -398,6 +470,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let self else { return false }
                 switch row {
                 case .clip: return self.applyClipHotKey(spec)
+                case .screenshot: return self.applyScreenshotHotKey(spec)
                 case .addTask: return self.applyAddTaskHotKey(spec)
                 case .quickCapture: return self.applyQuickCaptureHotKey(spec)
                 }

@@ -3,13 +3,13 @@ import Carbon.HIToolbox
 import SwiftUI
 import ArthurKit
 
-/// Lets Brandon rebind either of ArthurBar's two global hotkeys — reintroduced
+/// Lets Brandon rebind ArthurBar's global hotkeys — reintroduced
 /// in the same shape as craft-quick-capture's own hotkey-recorder settings
 /// screen: click a shortcut, then press the new key combo, captured via a
 /// local NSEvent monitor and encoded through HotKeySpec (which already wraps
 /// Carbon's RegisterEventHotKey underneath, in HotKey.swift).
 struct BarSettingsView: View {
-    enum Row: Equatable { case clip, addTask, quickCapture }
+    enum Row: Equatable { case clip, screenshot, addTask, quickCapture }
 
     @State private var hotKeys: BarHotKeys
     @State private var recordingRow: Row?
@@ -31,6 +31,7 @@ struct BarSettingsView: View {
             Divider()
             Text("Hotkeys").font(.system(size: 13, weight: .semibold))
             row(title: "Clip Selection", row: .clip, spec: hotKeys.clip)
+            row(title: "Clip Screenshot", row: .screenshot, spec: hotKeys.screenshot)
             row(title: "Quick Task", row: .addTask, spec: hotKeys.addTask)
             row(title: "Quick Capture", row: .quickCapture, spec: hotKeys.quickCapture)
             Text(message ?? "Click a shortcut, then press the new key combo. Include ⌘, ⌥, or ⌃.")
@@ -65,6 +66,7 @@ struct BarSettingsView: View {
     private func defaultSpec(for row: Row) -> HotKeySpec {
         switch row {
         case .clip: return BarHotKeys.defaultClip
+        case .screenshot: return BarHotKeys.defaultScreenshot
         case .addTask: return BarHotKeys.defaultAddTask
         case .quickCapture: return BarHotKeys.defaultQuickCapture
         }
@@ -107,6 +109,7 @@ struct BarSettingsView: View {
         if onApply(row, spec) {
             switch row {
             case .clip: hotKeys.clip = spec
+            case .screenshot: hotKeys.screenshot = spec
             case .addTask: hotKeys.addTask = spec
             case .quickCapture: hotKeys.quickCapture = spec
             }
@@ -125,6 +128,7 @@ struct ClipPageSection: View {
     @State private var isChoosing = false
     @State private var query = ""
     @State private var trusted = SelectionGrabber.isTrusted
+    @State private var canCapture = ScreenshotCapture.isAllowed
 
     private var scheme: ColorScheme { BarTheme.scheme }
     private var results: [CraftDocument] { documentStore.search(query, limit: 5) }
@@ -201,7 +205,18 @@ struct ClipPageSection: View {
                     }
                 }
             }
-            Text("Select text in any app and press the hotkey: it's added to the clip page as plain text. With nothing selected, a copied image or text is sent instead.")
+            HStack {
+                Text("Screen Recording")
+                Spacer()
+                if canCapture {
+                    Text("Allowed").foregroundStyle(.secondary)
+                } else {
+                    Button("Allow…") {
+                        if !ScreenshotCapture.requestPermission() { ScreenshotCapture.openSettings() }
+                    }
+                }
+            }
+            Text("Select text in any app and press the hotkey: it's added to the clip page as plain text. With nothing selected, a copied image or text is sent instead. The screenshot hotkey sends an area you drag over.")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -209,9 +224,11 @@ struct ClipPageSection: View {
         .onAppear {
             documentStore.refreshIfStale(craftLink: Config.load().craftLink)
             trusted = SelectionGrabber.isTrusted
+            canCapture = ScreenshotCapture.isAllowed
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             trusted = SelectionGrabber.isTrusted
+            canCapture = ScreenshotCapture.isAllowed
         }
     }
 }

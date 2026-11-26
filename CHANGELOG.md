@@ -5,6 +5,12 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+### Added
+- ArthurBar: Clip Screenshot. One hotkey (⌥⌘4 by default, rebindable), drag
+  over part of the screen, and the picture is appended to the clip page.
+  Escape cancels. The clipboard is untouched unless sending fails. Needs
+  Screen Recording permission. Mac only.
+
 ## [1.8.0] - 2026-11-26
 
 ### Added
