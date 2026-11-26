@@ -466,6 +466,17 @@ public struct CraftClient {
                            command: "blocks add --id \(pageId) --markdown \(quoted) --position end")
     }
 
+    /// Appends one image to the end of a page. Craft's image block wants a URL,
+    /// so the bytes go inline as a `data:` URL, which Craft imports and
+    /// re-hosts. `jpeg` must already fit — see `ImagePrep.jpegForCraft`.
+    public func appendImage(pageId: String, jpeg: Data) async throws {
+        try await appendBlocks(pageId: pageId, markdown: Self.imageMarkdown(jpeg: jpeg))
+    }
+
+    static func imageMarkdown(jpeg: Data) -> String {
+        "![Image](data:image/jpeg;base64,\(jpeg.base64EncodedString()))"
+    }
+
     /// Creates a brand-new page via `documents create`, optionally inside a
     /// folder — backs the "Document" quick-add flow (a new page, distinct
     /// from Quick Capture's Craft mode which appends to an *existing* one).

@@ -201,7 +201,7 @@ struct ClipPageSection: View {
                     }
                 }
             }
-            Text("Select text in any app and press the hotkey: it's added to the clip page as plain text.")
+            Text("Select text in any app and press the hotkey: it's added to the clip page as plain text. With nothing selected, a copied image or text is sent instead.")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

@@ -13,6 +13,8 @@ struct ClipRecord: Codable, Identifiable {
     var text: String
     var pageTitle: String
     var date = Date()
+    /// Optional so history saved before image clips still decodes.
+    var isImage: Bool?
 }
 
 enum ClipStore {
@@ -41,8 +43,16 @@ enum ClipStore {
     }
 
     static func record(text: String, pageTitle: String) {
+        insert(ClipRecord(text: text, pageTitle: pageTitle))
+    }
+
+    static func recordImage(pageTitle: String) {
+        insert(ClipRecord(text: "", pageTitle: pageTitle, isImage: true))
+    }
+
+    private static func insert(_ record: ClipRecord) {
         var list = recents
-        list.insert(ClipRecord(text: text, pageTitle: pageTitle), at: 0)
+        list.insert(record, at: 0)
         if list.count > maxRecents { list = Array(list.prefix(maxRecents)) }
         if let data = try? JSONEncoder().encode(list) {
             UserDefaults.standard.set(data, forKey: recentsKey)

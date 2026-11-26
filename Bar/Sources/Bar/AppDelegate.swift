@@ -101,8 +101,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Grabs the selected text from the front app and appends it, as plain
     /// text, to the clip page. No window: the toast is the only feedback.
-    /// Nothing selected falls back to the clipboard. If the save fails, the
-    /// text goes onto the clipboard so it isn't lost.
+    /// Nothing selected falls back to the clipboard, which may hold text or an
+    /// image. If a text save fails, the text goes onto the clipboard so it
+    /// isn't lost.
     private func clipSelection() {
         guard let page = ClipStore.page else {
             Toast.shared.show("Choose a clip page in ArthurBar settings", isError: true)
@@ -122,6 +123,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             var text = grabbed.text ?? ""
             if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if let image = ClipboardImage.data(from: .general) {
+                    await clipImage(image, to: page, craftLink: config.craftLink)
+                    return
+                }
                 text = NSPasteboard.general.string(forType: .string) ?? ""
             }
             let clip = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -141,6 +146,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                   ? "Offline. Copied to the clipboard instead"
                                   : "Couldn't save. Copied to the clipboard instead", isError: true)
             }
+        }
+    }
+
+    /// Shrinks a copied image and appends it to the clip page. The clipboard
+    /// is left alone, so a failed send loses nothing.
+    private func clipImage(_ original: Data, to page: ClipPage, craftLink: String) async {
+        Toast.shared.show("Sending image…")
+        do {
+            let jpeg = try await Task.detached { try ImagePrep.jpegForCraft(original) }.value
+            try await CraftClient(url: craftLink).appendImage(pageId: page.id, jpeg: jpeg)
+            ClipStore.recordImage(pageTitle: page.title)
+            statusItem.menu = buildMenu()
+            Toast.shared.show("Image added to \(page.title)")
+        } catch let failure as ImagePrep.Failure {
+            let message: String
+            switch failure {
+            case .tooSmall: message = "Image is too small for Craft (under 100 px)"
+            case .tooLarge: message = "Image is too large to send to Craft"
+            case .unreadable: message = "Couldn't read the copied image"
+            }
+            Toast.shared.show(message, isError: true)
+        } catch {
+            Toast.shared.show(isClearlyOffline(error)
+                              ? "Offline. The image is still on the clipboard"
+                              : "Couldn't save. The image is still on the clipboard", isError: true)
         }
     }
 
@@ -307,6 +337,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let recentItem = NSMenuItem(title: "Recent Clips", action: nil, keyEquivalent: "")
             let sub = NSMenu()
             for r in recents {
+                // An image clip has no text to copy back, so it's listed
+                // but not clickable (no action).
+                if r.isImage == true {
+                    sub.addItem(NSMenuItem(title: "Image  →  \(r.pageTitle)", action: nil, keyEquivalent: ""))
+                    continue
+                }
                 let flat = r.text.replacingOccurrences(of: "\n", with: " ")
                 let preview = flat.count > 40 ? String(flat.prefix(40)) + "…" : flat
                 let item = NSMenuItem(title: "\(preview)  →  \(r.pageTitle)", action: #selector(copyRecentClip(_:)), keyEquivalent: "")

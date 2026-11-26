@@ -5,6 +5,16 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+### Added
+- ArthurBar: Clip Selection sends images. Copy a screenshot or picture, then
+  press the clip hotkey with nothing selected, and it is appended to the clip
+  page. The image is shrunk to a JPEG that fits Craft's request limit
+  (images under 100 px on a side are refused).
+
+### Fixed
+- iPhone: the hide-keyboard button now has even space around its icon on all
+  sides.
+
 ## [1.7.1] - 2026-11-24
 
 ### Added

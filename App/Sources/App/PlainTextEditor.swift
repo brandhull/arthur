@@ -168,8 +168,11 @@ private struct UITextViewBridge: UIViewRepresentable {
         // on a keyboard-styled strip with breathing room around it.
         let bar = UIInputView(frame: CGRect(x: 0, y: 0, width: 0, height: 56), inputViewStyle: .keyboard)
         bar.allowsSelfSizing = true
-        let button = UIButton(type: .system)
-        button.setImage(UIImage(systemName: "keyboard.chevron.compact.down"), for: .normal)
+        let button = KeyboardHideButton(type: .system)
+        let glyph = UIImage(systemName: "keyboard.chevron.compact.down",
+                            withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .regular))
+        button.setImage(glyph, for: .normal)
+        button.accessibilityLabel = "Hide keyboard"
         button.tintColor = UIColor { t in UIColor(Theme.primary(t.userInterfaceStyle == .dark ? .dark : .light)) }
         button.backgroundColor = UIColor { t in UIColor(Theme.sidebarCardBackground(t.userInterfaceStyle == .dark ? .dark : .light)) }
         button.layer.cornerRadius = Theme.sidebarCardCornerRadius
@@ -182,8 +185,10 @@ private struct UITextViewBridge: UIViewRepresentable {
         NSLayoutConstraint.activate([
             button.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -12),
             button.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
-            button.widthAnchor.constraint(equalToConstant: 64),
-            button.heightAnchor.constraint(equalToConstant: 36)
+            // Sized from the glyph, so the space around it is the same on
+            // every side.
+            button.widthAnchor.constraint(equalToConstant: (glyph?.size.width ?? 24) + 20),
+            button.heightAnchor.constraint(equalToConstant: (glyph?.size.height ?? 20) + 20)
         ])
         view.inputAccessoryView = bar
         return view
@@ -271,6 +276,15 @@ private struct UITextViewBridge: UIViewRepresentable {
             UITextViewBridge.applyBulletIndent(textView)
             return false
         }
+    }
+}
+
+/// The keyboard symbol draws slightly left of its own center, which shows as
+/// uneven padding inside the button; this shifts it back.
+private final class KeyboardHideButton: UIButton {
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        if let imageView { imageView.center.x = bounds.midX }
     }
 }
 #endif
