@@ -5,6 +5,8 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-26
+
 ### Added
 - ArthurBar: Clip Screenshot. One hotkey (⌥⌘4 by default, rebindable), drag
   over part of the screen, and the picture is appended to the clip page.
