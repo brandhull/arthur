@@ -5,6 +5,8 @@ Sections: **Added**, **Changed**, **Fixed**, **Removed**.
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-26
+
 ### Added
 - ArthurBar: Clip Selection sends images. Copy a screenshot or picture, then
   press the clip hotkey with nothing selected, and it is appended to the clip
